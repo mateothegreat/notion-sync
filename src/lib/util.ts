@@ -533,3 +533,57 @@ export class DebugLogger {
     this.displayCount = count;
   }
 }
+
+/**
+ * Tracks rates of operations over time.
+ */
+export class RateTracker {
+  private lastCounts: Map<string, number> = new Map();
+  private lastTimes: Map<string, number> = new Map();
+  private rates: Map<string, number> = new Map();
+  private updateInterval: number;
+
+  constructor(updateInterval: number = 2000) {
+    this.updateInterval = updateInterval;
+  }
+
+  /**
+   * Update count for a metric and calculate its rate.
+   *
+   * @param metric - The metric name.
+   * @param currentCount - The current count.
+   */
+  updateMetric(metric: string, currentCount: number): number {
+    const now = Date.now();
+    const lastTime = this.lastTimes.get(metric) || now;
+    const lastCount = this.lastCounts.get(metric) || 0;
+
+    // Only update rate if enough time has passed
+    if (now - lastTime >= this.updateInterval) {
+      const timeDiff = (now - lastTime) / 1000; // Convert to seconds
+      const countDiff = currentCount - lastCount;
+      const rate = countDiff / timeDiff;
+
+      this.rates.set(metric, rate);
+      this.lastTimes.set(metric, now);
+      this.lastCounts.set(metric, currentCount);
+    }
+
+    return this.rates.get(metric) || 0;
+  }
+
+  /**
+   * Format a rate for display.
+   *
+   * @param rate - The rate to format.
+   */
+  static formatRate(rate: number): string {
+    if (rate >= 100) {
+      return `${Math.round(rate)}/s`;
+    } else if (rate >= 10) {
+      return `${rate.toFixed(1)}/s`;
+    } else {
+      return `${rate.toFixed(2)}/s`;
+    }
+  }
+}
