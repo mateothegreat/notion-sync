@@ -1,6 +1,6 @@
-# Notion Exporter
+# Notion Sync
 
-Notion Exporter is a tool for exporting Notion workspace content to JSON files.
+Notion Sync is a tool for importing and exporting content to and from Notion.
 
 ![](2025-07-01-11-59-05.png)
 
