@@ -1,0 +1,26 @@
+{
+  "excludes": [
+    {
+      "pattern": "Projects",
+      "types": ["database"]
+    },
+    {
+      "pattern": "foo",
+      "types": ["database"]
+    }
+  ],
+  "databases": {
+    "Content": {
+      "id": "16ad7342-e571-80c4-a065-c7a1015871d3",
+      "name": "Content"
+    },
+    "Series": {
+      "id": "18ed7342-e571-805c-94e2-f5f133151833",
+      "name": "Series"
+    },
+    "URLs": {
+      "id": "170d7342-e571-8090-abc8-c9b7969b0482",
+      "name": "URLs"
+    }
+  }
+}

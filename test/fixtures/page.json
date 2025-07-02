@@ -1,0 +1,172 @@
+{
+  "object": "page",
+  "id": "1e5d7342-e571-804b-9fd2-d97fd12ae897",
+  "created_time": "2025-04-30T18:45:00.000Z",
+  "last_edited_time": "2025-05-03T03:23:00.000Z",
+  "created_by": {
+    "object": "user",
+    "id": "ddf8f9da-d6d5-4c0a-ad8e-05836f719816"
+  },
+  "last_edited_by": {
+    "object": "user",
+    "id": "ddf8f9da-d6d5-4c0a-ad8e-05836f719816"
+  },
+  "cover": null,
+  "icon": null,
+  "parent": {
+    "type": "database_id",
+    "database_id": "16ad7342-e571-80c4-a065-c7a1015871d3"
+  },
+  "archived": false,
+  "in_trash": false,
+  "properties": {
+    "Created Date": {
+      "id": "%3DloG",
+      "type": "date",
+      "date": null
+    },
+    "Series": {
+      "id": "%3FxsZ",
+      "type": "relation",
+      "relation": [
+        {
+          "id": "1e8d7342-e571-8032-8d1e-de076836a018"
+        }
+      ],
+      "has_more": false
+    },
+    "Section": {
+      "id": "%40ofb",
+      "type": "select",
+      "select": {
+        "id": "rFL:",
+        "name": "Learning",
+        "color": "red"
+      }
+    },
+    "Status": {
+      "id": "BXDw",
+      "type": "status",
+      "status": {
+        "id": "d9d48b12-7eca-4672-8b90-be2b1962bac9",
+        "name": "In progress",
+        "color": "blue"
+      }
+    },
+    "Weight": {
+      "id": "MF%3FD",
+      "type": "number",
+      "number": 2
+    },
+    "Publish Date": {
+      "id": "S%3Bkc",
+      "type": "date",
+      "date": {
+        "start": "2025-04-29",
+        "end": null,
+        "time_zone": null
+      }
+    },
+    "URL": {
+      "id": "ZyoT",
+      "type": "url",
+      "url": null
+    },
+    "URL Database Links": {
+      "id": "Z%7B%7D%3E",
+      "type": "relation",
+      "relation": [
+        {
+          "id": "1e5d7342-e571-806f-a89f-d1933aa97af3"
+        }
+      ],
+      "has_more": false
+    },
+    "Type": {
+      "id": "bJ%5Da",
+      "type": "select",
+      "select": {
+        "id": "29b10d3a-6dc6-452c-a6e0-46cf890f78e2",
+        "name": "Series Page",
+        "color": "green"
+      }
+    },
+    "Cover": {
+      "id": "bKp%5C",
+      "type": "files",
+      "files": [
+        {
+          "name": "cover.jpg",
+          "type": "file",
+          "file": {
+            "url": "https://prod-files-secure.s3.us-west-2.amazonaws.com/00201b62-457b-442a-abb2-606117be8411/3094559b-1335-4037-b7d9-8589ffa56ed1/cover.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAZI2LB466YOLYAKSJ%2F20250621%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20250621T053944Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEOP%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaCXVzLXdlc3QtMiJIMEYCIQCTwkyDStKuFe9PJEog%2FBJJQz938%2FPtZmdKyipnJ%2BOMRgIhAKTEzQBgyr1MBk39mseaVeW54umRGxhvKHgs6MU0L%2B4NKogECMz%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEQABoMNjM3NDIzMTgzODA1IgxOtMwTtLcPACP0q18q3AMcKP%2BPKjqZ9btifYg3R9yxYPCdfwNJFdGu7eEZb7WPL6cKa83qqVcZ0smcAKsO6pN8BJj5fvrGNWWXkZCklbqGTTrbv7fQzcjbTed4k6g9BbbS7nXUB3Mdq47CNWy2OXwXPVubLTBfaeA%2FHSLF7WCT5RfGy1t9tv8NjRGL3p2d8DuznjqejXSPHw9DwVdW%2BdZMRp%2FArmPSok4Bc5N69odNo9MPy6xIeh1TpORt1CcbajAZa3N%2Fy%2BxtQV6s2IbnpK9oZ%2Fb7scgwDNoSHZ9oE5b%2FUCc%2BUmNkSWTEzwz92WBbDhwWP4FGjIHyjxCWRTL%2BEMMNYdVlRc9dzR%2F4UdPhkWwrSOAtKV0a7yoPefhPfo3HW4TOx65OZsINvya1y2IfQop%2Fr3JIwZVl7dFEh%2B4zEXMKQpqKjHwGZmHOw9Jb8ZZLPVEzqhkm%2BJmjSoRgS%2B3Bm%2FQOk2dyOWeYLIjzLFHoegwDCa6NBhKJ0hGaREbMHapZFxqCdnVXr3uzw81j05TognYhtfwZSry4ozHxS67Klov7ZwWW%2BbnvEcY7ysZIXkXachx5o2KC8HFtOLlG%2BM6hfp4GAPuEh3cQbB6e%2BqBex6hwlJU6Teaj80kkkYxNqw5LyaQQr82KyDfpdNOS5TCiv9jCBjqkAX5GjWriQ9CI%2FWAO6mOM9NfBFgpx8KLX0npfpDPyk%2BANHMKJqxTQo7OEBwFrn9kPHZllsj8m8hVGt9eIT8v7JukPKroPJGrMNZWEKgPEwocfaqIDaRrJkEKtqUDsy3Xfoq28HXmCuAFuMRlwmqJ3XLvL%2Fr6EKRMRuqzt2h3vCtNRX5WhfY5e0CRC8Q%2FC3BJHUYoc0JkalAphp5lJRCm5tkAn%2FqAq&X-Amz-Signature=869590fa3c122de143edc7aad208f26d38f92a5d56c1bdae6eaf42cb63fe0eb2&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject",
+            "expiry_time": "2025-06-21T06:39:44.085Z"
+          }
+        }
+      ]
+    },
+    "Tags": {
+      "id": "krBQ",
+      "type": "multi_select",
+      "multi_select": [
+        {
+          "id": "2f151a4f-d925-472f-bd72-e92467750459",
+          "name": "foo",
+          "color": "default"
+        },
+        {
+          "id": "93684789-a495-4431-99eb-60d63b219eab",
+          "name": "bar",
+          "color": "green"
+        }
+      ]
+    },
+    "Excerpt": {
+      "id": "mAKh",
+      "type": "rich_text",
+      "rich_text": []
+    },
+    "Glossary Links": {
+      "id": "otq%3D",
+      "type": "relation",
+      "relation": [],
+      "has_more": false
+    },
+    "Snippet Package": {
+      "id": "wfNq",
+      "type": "relation",
+      "relation": [
+        {
+          "id": "1e5d7342-e571-809f-b6f6-e4348b309e44"
+        }
+      ],
+      "has_more": false
+    },
+    "Name": {
+      "id": "title",
+      "type": "title",
+      "title": [
+        {
+          "type": "text",
+          "text": {
+            "content": "Infrastructure",
+            "link": null
+          },
+          "annotations": {
+            "bold": true,
+            "italic": false,
+            "strikethrough": false,
+            "underline": false,
+            "code": false,
+            "color": "default"
+          },
+          "plain_text": "Infrastructure",
+          "href": null
+        }
+      ]
+    }
+  },
+  "url": "https://www.notion.so/Infrastructure-1e5d7342e571804b9fd2d97fd12ae897",
+  "public_url": null,
+  "request_id": "6d5d61e7-e140-40fd-a0ae-d7a32180a5ed"
+}

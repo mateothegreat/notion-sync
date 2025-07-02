@@ -1,0 +1,414 @@
+{
+  "object": "database",
+  "id": "16ad7342-e571-80c4-a065-c7a1015871d3",
+  "cover": null,
+  "icon": {
+    "type": "external",
+    "external": {
+      "url": "https://www.notion.so/icons/gradebook_gray.svg"
+    }
+  },
+  "created_time": "2024-12-28T17:25:00.000Z",
+  "created_by": {
+    "object": "user",
+    "id": "ddf8f9da-d6d5-4c0a-ad8e-05836f719816"
+  },
+  "last_edited_by": {
+    "object": "user",
+    "id": "ddf8f9da-d6d5-4c0a-ad8e-05836f719816"
+  },
+  "last_edited_time": "2025-05-01T20:45:00.000Z",
+  "title": [
+    {
+      "type": "text",
+      "text": {
+        "content": "Content",
+        "link": null
+      },
+      "annotations": {
+        "bold": false,
+        "italic": false,
+        "strikethrough": false,
+        "underline": false,
+        "code": false,
+        "color": "default"
+      },
+      "plain_text": "Content",
+      "href": null
+    }
+  ],
+  "description": [
+    {
+      "type": "text",
+      "text": {
+        "content": "So be it what may come.",
+        "link": null
+      },
+      "annotations": {
+        "bold": false,
+        "italic": false,
+        "strikethrough": false,
+        "underline": false,
+        "code": false,
+        "color": "default"
+      },
+      "plain_text": "So be it what may come.",
+      "href": null
+    }
+  ],
+  "is_inline": false,
+  "properties": {
+    "Series": {
+      "id": "%3FxsZ",
+      "name": "Series",
+      "type": "multi_select",
+      "multi_select": {
+        "options": [
+          {
+            "id": "bnHu",
+            "name": "Data Mesh",
+            "color": "blue",
+            "description": null
+          },
+          {
+            "id": "570a3294-0e2c-4fc9-972c-3ea9756d5c69",
+            "name": "AI",
+            "color": "green",
+            "description": null
+          },
+          {
+            "id": "cd48ce25-a4bd-4153-82d3-ac60240a0e89",
+            "name": "Kubernetes",
+            "color": "pink",
+            "description": null
+          },
+          {
+            "id": "10afd713-bb54-48cc-b3cb-f963ab5154b2",
+            "name": "Testing Series 1",
+            "color": "red",
+            "description": null
+          },
+          {
+            "id": "467e4eb7-2dd4-45f5-af0c-4bdd58cb2167",
+            "name": "Minecraft on Kubernetes",
+            "color": "purple",
+            "description": null
+          },
+          {
+            "id": "3c277891-20e4-4e4c-992d-183416cde629",
+            "name": "Architects Watercooler",
+            "color": "brown",
+            "description": null
+          }
+        ]
+      }
+    },
+    "Section": {
+      "id": "%40ofb",
+      "name": "Section",
+      "type": "select",
+      "select": {
+        "options": [
+          {
+            "id": "si?~",
+            "name": "Blog",
+            "color": "blue",
+            "description": null
+          },
+          {
+            "id": "rFL:",
+            "name": "Learning",
+            "color": "red",
+            "description": null
+          },
+          {
+            "id": ">oXl",
+            "name": "Watercooler",
+            "color": "purple",
+            "description": null
+          }
+        ]
+      }
+    },
+    "Status": {
+      "id": "BXDw",
+      "name": "Status",
+      "type": "status",
+      "status": {
+        "options": [
+          {
+            "id": "e1c763c3-a491-42af-b808-4b1c34b8f578",
+            "name": "Not started",
+            "color": "default",
+            "description": null
+          },
+          {
+            "id": "d9d48b12-7eca-4672-8b90-be2b1962bac9",
+            "name": "In progress",
+            "color": "blue",
+            "description": null
+          },
+          {
+            "id": "f4ef3434-400a-4503-9459-d24db742210b",
+            "name": "Done",
+            "color": "green",
+            "description": null
+          }
+        ],
+        "groups": [
+          {
+            "id": "68e16685-b8ab-493a-9f65-6d85d4e67cf1",
+            "name": "To-do",
+            "color": "gray",
+            "option_ids": ["e1c763c3-a491-42af-b808-4b1c34b8f578"]
+          },
+          {
+            "id": "2ee4a4d1-2b22-4927-9745-d42b5114860b",
+            "name": "In progress",
+            "color": "blue",
+            "option_ids": ["d9d48b12-7eca-4672-8b90-be2b1962bac9"]
+          },
+          {
+            "id": "c1964db0-da02-477c-9bc8-20dd69bc0a04",
+            "name": "Complete",
+            "color": "green",
+            "option_ids": ["f4ef3434-400a-4503-9459-d24db742210b"]
+          }
+        ]
+      }
+    },
+    "Weight": {
+      "id": "MF%3FD",
+      "name": "Weight",
+      "type": "number",
+      "number": {
+        "format": "number"
+      }
+    },
+    "Publish Date": {
+      "id": "S%3Bkc",
+      "name": "Publish Date",
+      "type": "date",
+      "date": {}
+    },
+    "URL": {
+      "id": "ZyoT",
+      "name": "URL",
+      "type": "url",
+      "url": {}
+    },
+    "Type": {
+      "id": "bJ%5Da",
+      "name": "Type",
+      "type": "select",
+      "select": {
+        "options": [
+          {
+            "id": "z[V~",
+            "name": "Article",
+            "color": "red",
+            "description": null
+          },
+          {
+            "id": "VAoE",
+            "name": "Blog Post",
+            "color": "blue",
+            "description": null
+          },
+          {
+            "id": "?zdw",
+            "name": "News",
+            "color": "brown",
+            "description": null
+          },
+          {
+            "id": "29b10d3a-6dc6-452c-a6e0-46cf890f78e2",
+            "name": "Series Page",
+            "color": "green",
+            "description": null
+          }
+        ]
+      }
+    },
+    "Tags": {
+      "id": "krBQ",
+      "name": "Tags",
+      "type": "multi_select",
+      "multi_select": {
+        "options": [
+          {
+            "id": "850f7732-2f8c-4269-9805-e932d1c25dd5",
+            "name": "aws",
+            "color": "default",
+            "description": null
+          },
+          {
+            "id": "868a372a-a88c-4050-9253-bbc35046e66c",
+            "name": "advice",
+            "color": "gray",
+            "description": null
+          },
+          {
+            "id": "={yj",
+            "name": "ai",
+            "color": "yellow",
+            "description": null
+          },
+          {
+            "id": "93684789-a495-4431-99eb-60d63b219eab",
+            "name": "bar",
+            "color": "green",
+            "description": null
+          },
+          {
+            "id": "A\\uJ",
+            "name": "chat",
+            "color": "pink",
+            "description": null
+          },
+          {
+            "id": "8738b243-0f14-4dd6-ad7d-49b525a5e775",
+            "name": "diagram",
+            "color": "default",
+            "description": null
+          },
+          {
+            "id": "5ffc9326-531d-42f2-8e77-1e804952d581",
+            "name": "eks",
+            "color": "red",
+            "description": null
+          },
+          {
+            "id": "c06a1a1d-0f64-49ae-86b7-0b29e578516d",
+            "name": "expertise",
+            "color": "gray",
+            "description": null
+          },
+          {
+            "id": "2f151a4f-d925-472f-bd72-e92467750459",
+            "name": "foo",
+            "color": "default",
+            "description": null
+          },
+          {
+            "id": "78bd1bfc-1935-4a93-8130-c4e408a70dbb",
+            "name": "go",
+            "color": "red",
+            "description": null
+          },
+          {
+            "id": "861246a8-b762-42e3-8a2f-e61388429847",
+            "name": "infrastructure",
+            "color": "gray",
+            "description": null
+          },
+          {
+            "id": "681dfeea-da36-4419-8ef6-756fadc7cc44",
+            "name": "istio",
+            "color": "brown",
+            "description": null
+          },
+          {
+            "id": "b6e045cc-7bf0-45d5-9a26-9d572bf4f520",
+            "name": "knowledge base",
+            "color": "default",
+            "description": null
+          },
+          {
+            "id": "5c1c8a28-60bc-43a6-8c3d-4f13e25505f8",
+            "name": "knowledge-ecosystem",
+            "color": "green",
+            "description": null
+          },
+          {
+            "id": "d1c8e705-f8c3-489c-a637-dff81e43d79c",
+            "name": "deliberate-practice",
+            "color": "orange",
+            "description": null
+          },
+          {
+            "id": "a62d4a04-0a0f-41dc-8c7d-10a05c7f0f69",
+            "name": "kubernetes",
+            "color": "yellow",
+            "description": null
+          },
+          {
+            "id": "1108521f-a3f1-406b-8e9a-fadf3308509c",
+            "name": "ml",
+            "color": "brown",
+            "description": null
+          },
+          {
+            "id": "09a43c32-71ba-4d18-a3bf-51567a3d080f",
+            "name": "opinion",
+            "color": "green",
+            "description": null
+          },
+          {
+            "id": "878c5544-6d59-4b98-97f0-602d4ab7ee7a",
+            "name": "personal-growth",
+            "color": "blue",
+            "description": null
+          },
+          {
+            "id": "07c87bcb-0be7-4bce-8497-d0ced6204a12",
+            "name": "pinecone",
+            "color": "purple",
+            "description": null
+          },
+          {
+            "id": "57147262-cc93-4291-8e5d-9949af9cb977",
+            "name": "rag",
+            "color": "blue",
+            "description": null
+          },
+          {
+            "id": "f0caf7cc-0b7c-473b-9d90-7ec26cc755fc",
+            "name": "shell",
+            "color": "green",
+            "description": null
+          },
+          {
+            "id": "a236afc9-3d8c-4e8f-bdc0-f22ed5b00070",
+            "name": "software-engineering",
+            "color": "blue",
+            "description": null
+          },
+          {
+            "id": "6fb14b4e-4611-410b-9107-91ec4e08d726",
+            "name": "subject matter expertise",
+            "color": "red",
+            "description": null
+          },
+          {
+            "id": "47037573-4be8-40b8-ad6f-80c9eb525de2",
+            "name": "opencv",
+            "color": "green",
+            "description": null
+          }
+        ]
+      }
+    },
+    "Excerpt": {
+      "id": "mAKh",
+      "name": "Excerpt",
+      "type": "rich_text",
+      "rich_text": {}
+    },
+    "Name": {
+      "id": "title",
+      "name": "Name",
+      "type": "title",
+      "title": {}
+    }
+  },
+  "parent": {
+    "type": "workspace",
+    "workspace": true
+  },
+  "url": "https://www.notion.so/16ad7342e57180c4a065c7a1015871d3",
+  "public_url": null,
+  "archived": false,
+  "in_trash": false,
+  "request_id": "c99b6f13-324f-423d-a826-af54a6e66d9b"
+}

@@ -1,0 +1,47 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug bin/get-databases.ts with tsx",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "tsx"
+      ],
+      "args": [
+        "${workspaceFolder}/bin/get-databases.ts"
+      ],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "test properties",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vitest"
+      ],
+      "args": [
+        "--watch",
+        "--ui",
+        "--open",
+        "${workspaceFolder}/src/properties/property.spec.ts"
+      ],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
+    }
+  ]
+}
