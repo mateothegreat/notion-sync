@@ -5,9 +5,9 @@ export {
   NotionApiStreamer,
   OptimizedNotionExportCLI,
   StreamingExportManager
-} from "./tmp";
+} from "../../tmp/bad";
 
-export type { ExportItem, OptimizedExportConfig, StreamingExportConfig } from "./tmp";
+export type { ExportItem, OptimizedExportConfig, StreamingExportConfig } from "../../tmp/bad";
 
 // Export individual utility modules (but not the ones already exported from ./export)
 export {

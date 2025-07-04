@@ -1,5 +1,5 @@
+import Export from "$lib/bad/export";
 import { InferredFlags } from "@oclif/core/interfaces";
-import Export from "src/commands/export";
 import { getDateString } from "./util";
 
 /**
