@@ -20,7 +20,7 @@ export async function* streamPaginatedAPI<T extends { next_cursor: string | null
     try {
       const args = {
         ...firstPageArgs,
-        start_cursor: nextCursor,
+        ...(nextCursor && { start_cursor: nextCursor }),
         page_size: Math.min(pageSize, maxMemoryItems)
       };
 

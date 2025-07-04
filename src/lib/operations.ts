@@ -1,4 +1,4 @@
-import { delay } from "$lib/util";
+import { CircuitBreaker, delay } from "$lib/util";
 import { APIErrorCode, ClientErrorCode, isNotionClientError } from "@notionhq/client";
 
 /**
@@ -77,6 +77,143 @@ export interface OperationEventEmitter {
 }
 
 /**
+ * Retry context for smart retry operations.
+ */
+export interface RetryContext {
+  operationType?: "read" | "write" | "delete";
+  priority?: "high" | "normal" | "low";
+  circuitBreaker?: CircuitBreaker;
+  objectId?: string;
+}
+
+/**
+ * Smart retry operation with enhanced retry logic and context awareness.
+ *
+ * @param operation - The operation to retry.
+ * @param operationName - The name of the operation.
+ * @param context - Optional retry context for smarter retry decisions.
+ * @param maxRetries - The maximum number of retries.
+ * @param baseDelay - The base delay between retries.
+ * @param timeout - The base timeout for the operation.
+ * @param eventEmitter - Optional event emitter for retry events.
+ *
+ * @returns A promise that resolves when the operation is completed.
+ */
+export async function smartRetryOperation<T>(
+  operation: () => Promise<T>,
+  operationName: string,
+  context: RetryContext = {},
+  maxRetries: number = 3,
+  baseDelay: number = 1000,
+  timeout?: number,
+  eventEmitter?: OperationEventEmitter
+): Promise<T> {
+  // Check circuit breaker if provided
+  if (context.circuitBreaker && !context.circuitBreaker.canProceed()) {
+    throw new Error(`Circuit breaker is open for ${operationName}`);
+  }
+
+  // Adjust retry policy based on operation type
+  const adjustedMaxRetries =
+    context.operationType === "write"
+      ? Math.min(maxRetries, 1)
+      : context.operationType === "delete"
+      ? Math.min(maxRetries, 2)
+      : maxRetries;
+
+  // Adjust base delay based on priority
+  const adjustedBaseDelay =
+    context.priority === "high" ? baseDelay * 0.5 : context.priority === "low" ? baseDelay * 2 : baseDelay;
+
+  let lastError: Error | unknown;
+  const startTime = Date.now();
+
+  for (let attempt = 0; attempt <= adjustedMaxRetries; attempt++) {
+    try {
+      // Emit API call event
+      if (eventEmitter && attempt === 0) {
+        eventEmitter.emit("api-call", {
+          operation: operationName,
+          params: { objectId: context.objectId }
+        });
+      }
+
+      // Adaptive timeout: increase timeout with each retry
+      const adaptiveTimeout = timeout ? timeout * (attempt + 1) : undefined;
+
+      const operationPromise = operation();
+
+      if (adaptiveTimeout) {
+        const timeoutPromise = new Promise<T>((_, reject) => {
+          const timeoutId = globalThis.setTimeout(() => {
+            globalThis.clearTimeout(timeoutId);
+            reject(
+              new Error(
+                `${operationName} timed out after ${adaptiveTimeout}ms (attempt ${attempt + 1}/${
+                  adjustedMaxRetries + 1
+                })`
+              )
+            );
+          }, adaptiveTimeout);
+        });
+
+        const result = await Promise.race([operationPromise, timeoutPromise]);
+
+        // Report success to circuit breaker
+        if (context.circuitBreaker) {
+          context.circuitBreaker.reportSuccess();
+        }
+
+        return result;
+      }
+
+      const result = await operationPromise;
+
+      // Report success to circuit breaker
+      if (context.circuitBreaker) {
+        context.circuitBreaker.reportSuccess();
+      }
+
+      return result;
+    } catch (error) {
+      lastError = error;
+
+      // Report failure to circuit breaker
+      if (context.circuitBreaker) {
+        context.circuitBreaker.reportFailure();
+      }
+
+      const isRetryable = isRetryableError(error);
+      const hasRetriesLeft = attempt < adjustedMaxRetries;
+
+      if (!isRetryable || !hasRetriesLeft) {
+        throw error;
+      }
+
+      // Calculate exponential backoff delay with jitter
+      const backoffDelay = calculateBackoffDelay(attempt, adjustedBaseDelay);
+
+      // Emit retry event
+      if (eventEmitter) {
+        eventEmitter.emit("retry", {
+          operation: operationName,
+          attempt: attempt + 1,
+          maxRetries: adjustedMaxRetries + 1,
+          error: error instanceof Error ? error.message : String(error),
+          delay: backoffDelay,
+          objectId: context.objectId
+        });
+      }
+
+      await delay(backoffDelay);
+    }
+  }
+
+  const totalTime = Date.now() - startTime;
+  throw lastError;
+}
+
+/**
  * Utility function for retrying failed operations with exponential backoff and adaptive timeout.
  *
  * @param operation - The operation to retry.
@@ -96,66 +233,16 @@ export async function retryOperation<T>(
   timeout?: number,
   eventEmitter?: OperationEventEmitter
 ): Promise<T> {
-  let lastError: Error | unknown;
-  const startTime = Date.now();
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      // Emit API call event
-      if (eventEmitter && attempt === 0) {
-        eventEmitter.emit("api-call", { operation: operationName, params: {} });
-      }
-
-      // Adaptive timeout: increase timeout with each retry
-      const adaptiveTimeout = timeout ? timeout * (attempt + 1) : undefined;
-
-      const operationPromise = operation();
-
-      if (adaptiveTimeout) {
-        const timeoutPromise = new Promise<T>((_, reject) => {
-          const timeoutId = globalThis.setTimeout(() => {
-            globalThis.clearTimeout(timeoutId);
-            reject(
-              new Error(
-                `${operationName} timed out after ${adaptiveTimeout}ms (attempt ${attempt + 1}/${maxRetries + 1})`
-              )
-            );
-          }, adaptiveTimeout);
-        });
-
-        return await Promise.race([operationPromise, timeoutPromise]);
-      }
-
-      return await operationPromise;
-    } catch (error) {
-      lastError = error;
-
-      const isRetryable = isRetryableError(error);
-      const hasRetriesLeft = attempt < maxRetries;
-
-      if (!isRetryable || !hasRetriesLeft) {
-        throw error;
-      }
-
-      // Calculate exponential backoff delay
-      const backoffDelay = calculateBackoffDelay(attempt, delayMs);
-
-      // Emit retry event
-      if (eventEmitter) {
-        eventEmitter.emit("retry", {
-          operation: operationName,
-          attempt: attempt + 1,
-          maxRetries: maxRetries + 1,
-          error: error instanceof Error ? error.message : String(error)
-        });
-      }
-
-      await delay(backoffDelay);
-    }
-  }
-
-  const totalTime = Date.now() - startTime;
-  throw lastError;
+  // Delegate to smartRetryOperation with default context
+  return smartRetryOperation(
+    operation,
+    operationName,
+    { operationType: "read" },
+    maxRetries,
+    delayMs,
+    timeout,
+    eventEmitter
+  );
 }
 
 /**
