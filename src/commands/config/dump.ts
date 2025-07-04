@@ -1,6 +1,6 @@
 import { BaseCommand } from "$lib/commands/base-command";
 import { baseFlags } from "$lib/commands/flags";
-import { getDateString } from "$lib/util";
+import { getDateString } from "$lib/export/util";
 import { Flags } from "@oclif/core";
 import chalk from "chalk";
 import { inspect } from "util";

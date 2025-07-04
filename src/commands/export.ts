@@ -1,7 +1,7 @@
 import { BaseCommand } from "$lib/commands/base-command";
 import { Exporter } from "$lib/export/exporter";
 import { StreamingExportManager } from "$lib/export/manager";
-import { DebugLogger, getDateString, LogLevel, RateTracker } from "$lib/util";
+import { DebugLogger, getDateString, LogLevel, RateTracker } from "$lib/export/util";
 import { Flags } from "@oclif/core";
 import chalk from "chalk";
 import { config } from "dotenv";

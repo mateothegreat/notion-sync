@@ -1,4 +1,4 @@
-import { CircuitBreaker, delay } from "$lib/util";
+import { CircuitBreaker, delay } from "$lib/export/util";
 import { APIErrorCode, ClientErrorCode, isNotionClientError } from "@notionhq/client";
 
 /**

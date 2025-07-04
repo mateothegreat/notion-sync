@@ -1,6 +1,6 @@
 import { InferredFlags } from "@oclif/core/interfaces";
 import Export from "src/commands/export";
-import { getDateString } from "../util";
+import { getDateString } from "./util";
 
 /**
  * Configuration options for the workspace exporter.

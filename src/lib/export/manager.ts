@@ -1,10 +1,10 @@
 import { createWriteStream, WriteStream } from "fs";
 import { join } from "path";
-import { OperationTypeAwareLimiter, type OperationType } from "../concurrency-manager";
 import { smartRetryOperation, type OperationEventEmitter, type RetryContext } from "../operations";
 import { PersistentProgressTracker, ProgressReporter } from "../progress-tracking";
-import { AdaptiveRateLimiter } from "../rate-limiting";
-import { CircuitBreaker, RateTracker } from "../util";
+import { OperationTypeAwareLimiter, type OperationType } from "./concurrency-manager";
+import { AdaptiveRateLimiter } from "./rate-limiting";
+import { CircuitBreaker, RateTracker } from "./util";
 
 interface ExportCheckpoint {
   exportId: string;

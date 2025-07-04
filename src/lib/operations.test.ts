@@ -1,5 +1,6 @@
 import { APIErrorCode } from "@notionhq/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { CircuitBreaker, delay } from "./export/util";
 import {
   collectPaginatedAPI,
   iteratePaginatedAPI,
@@ -8,7 +9,6 @@ import {
   type OperationEventEmitter,
   type RetryContext
 } from "./operations";
-import { CircuitBreaker, delay } from "./util";
 
 describe("operations", () => {
   describe("smartRetryOperation", () => {

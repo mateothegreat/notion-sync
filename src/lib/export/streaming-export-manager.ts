@@ -1,8 +1,8 @@
 import type { ExportCheckpoint } from "../progress-tracking";
 import { PersistentProgressTracker } from "../progress-tracking";
-import { BoundedQueue } from "../streaming";
 import { NotionApiStreamer } from "./notion-api-streamer";
 import { StreamProcessor } from "./stream-processor";
+import { BoundedQueue } from "./streaming";
 
 export interface StreamingExportConfig {
   maxMemoryMB: number;
@@ -230,6 +230,6 @@ export class StreamingExportManager {
   private async estimateWorkspaceSize(): Promise<number> {
     // This would be implemented to query Notion API for workspace size
     // For now, return a placeholder
-    return 10000;
+    return 0;
   }
 }

@@ -1,7 +1,7 @@
 import { EventEmitter } from "events";
-import { OperationTypeAwareLimiter } from "../concurrency-manager";
-import { AdaptiveRateLimiter } from "../rate-limiting";
-import { streamPaginatedAPI } from "../streaming";
+import { OperationTypeAwareLimiter } from "./concurrency-manager";
+import { AdaptiveRateLimiter } from "./rate-limiting";
+import { streamPaginatedAPI } from "./streaming";
 import type { ExportItem } from "./streaming-export-manager";
 
 interface NotionApiStreamerConfig {

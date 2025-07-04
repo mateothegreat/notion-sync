@@ -1,6 +1,6 @@
 import { promises as fs } from "fs";
 import { join } from "path";
-import { RateTracker } from "./util";
+import { RateTracker } from "./export/util";
 
 /**
  * Export checkpoint data for resumable operations.

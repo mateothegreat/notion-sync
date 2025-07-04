@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BoundedQueue, streamPaginatedAPI, StreamProcessor } from "./streaming";
-import { delay } from "./util";
+import { BoundedQueue, streamPaginatedAPI, StreamProcessor } from "./export/streaming";
+import { delay } from "./export/util";
 
 describe("streaming", () => {
   describe("streamPaginatedAPI", () => {

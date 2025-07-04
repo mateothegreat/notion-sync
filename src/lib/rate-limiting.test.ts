@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AdaptiveRateLimiter, OperationTypeAwareLimiter, parallelPaginatedFetch } from "./rate-limiting";
-import { delay } from "./util";
+import { AdaptiveRateLimiter, OperationTypeAwareLimiter, parallelPaginatedFetch } from "./export/rate-limiting";
+import { delay } from "./export/util";
 
 describe("rate-limiting", () => {
   describe("AdaptiveRateLimiter", () => {

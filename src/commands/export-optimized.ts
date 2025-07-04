@@ -4,7 +4,7 @@ import chalk from "chalk";
 import { config } from "dotenv";
 import { BaseCommand } from "../lib/commands/base-command";
 import { baseFlags } from "../lib/commands/flags";
-import { createOptimizedExportCLI } from "../lib/export";
+import { createOptimizedExportCLI } from "../lib/tmp";
 
 config({
   path: ".env",

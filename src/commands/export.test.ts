@@ -1,6 +1,6 @@
 import { runCommand } from "@oclif/test";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { getDateString } from "../lib/util";
+import { getDateString } from "../lib/export/util";
 
 describe("export", () => {
   const defaultOutputDir = `./notion-export-${getDateString()}`;

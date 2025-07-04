@@ -2,7 +2,7 @@ import { Flags } from "@oclif/core";
 import { BaseCommand } from "../../lib/commands/base-command";
 import { baseFlags } from "../../lib/commands/flags";
 import { NotionExportManager } from "../../lib/export-manager";
-import { getDateString } from "../../lib/util";
+import { getDateString } from "../../lib/export/util";
 
 /**
  * Export Notion workspace with high-performance streaming and resumability.
