@@ -20,6 +20,7 @@ interface RateLimitStats {
   remainingRequests: number;
   resetTime: Date;
   currentRate: number;
+  quotaLimit: number;
 
   // Performance metrics
   avgResponseTime: number;
@@ -34,11 +35,29 @@ interface RateLimitStats {
   totalRequests: number;
   totalErrors: number;
   lastAdjustmentTime: Date;
+  lastHeaderUpdate: Date | null;
 
   // Concurrency metrics
   recommendedConcurrency: number;
   currentConcurrency: number;
   concurrencyAdjustments: number;
+
+  // Retry tracking
+  retryStats: {
+    totalAttempts: number;
+    successfulRetries: number;
+    failedRetries: number;
+    retriesPerMinute: number;
+  };
+
+  // API header information
+  lastApiHeaders: {
+    limit?: string;
+    remaining?: string;
+    reset?: string;
+    retryAfter?: string;
+    receivedAt: Date | null;
+  };
 }
 
 /**
@@ -112,6 +131,11 @@ export class AdaptiveRateLimiter {
   private maxHeaderErrors = 10;
   private fallbackMode = false;
   private lastValidHeaders: ApiHeaders = {};
+
+  // Retry tracking
+  private retryAttempts: Array<{ timestamp: number; successful: boolean }> = [];
+  private lastHeaderUpdateTime: Date | null = null;
+  private lastReceivedHeaders: ApiHeaders = {};
 
   constructor(config: Partial<DynamicConcurrencyConfig> = {}) {
     this.config = {
@@ -209,7 +233,9 @@ export class AdaptiveRateLimiter {
       // Update performance metrics
       this.updatePerformanceMetrics(responseTime, wasError);
 
-      // Store last valid headers for fallback
+      // Store header tracking information
+      this.lastReceivedHeaders = parsedHeaders;
+      this.lastHeaderUpdateTime = new Date();
       this.lastValidHeaders = parsedHeaders;
       this.headerParsingErrors = 0;
       this.fallbackMode = false;
@@ -280,10 +306,16 @@ export class AdaptiveRateLimiter {
       }
     }
 
+    // Calculate retry statistics
+    const recentRetries = this.retryAttempts.filter((r) => r.timestamp > windowStart);
+    const successfulRetries = this.retryAttempts.filter((r) => r.successful).length;
+    const failedRetries = this.retryAttempts.length - successfulRetries;
+
     return {
       remainingRequests: this.remainingRequests,
       resetTime: new Date(this.resetTime),
       currentRate: requestsInWindow,
+      quotaLimit: this.limit,
 
       avgResponseTime: responseTimeCount > 0 ? avgResponseTime / responseTimeCount : 0,
       successRate: this.count > 0 ? (this.count - errorCount) / this.count : 1,
@@ -295,10 +327,26 @@ export class AdaptiveRateLimiter {
       totalRequests: this.totalRequests,
       totalErrors: this.totalErrors,
       lastAdjustmentTime: new Date(this.lastAdjustmentTime),
+      lastHeaderUpdate: this.lastHeaderUpdateTime,
 
       recommendedConcurrency: this.recommendedConcurrency,
       currentConcurrency: this.currentConcurrency,
-      concurrencyAdjustments: this.concurrencyAdjustments
+      concurrencyAdjustments: this.concurrencyAdjustments,
+
+      retryStats: {
+        totalAttempts: this.retryAttempts.length,
+        successfulRetries,
+        failedRetries,
+        retriesPerMinute: recentRetries.length
+      },
+
+      lastApiHeaders: {
+        limit: this.lastReceivedHeaders["x-ratelimit-limit"],
+        remaining: this.lastReceivedHeaders["x-ratelimit-remaining"],
+        reset: this.lastReceivedHeaders["x-ratelimit-reset"],
+        retryAfter: this.lastReceivedHeaders["retry-after"],
+        receivedAt: this.lastHeaderUpdateTime
+      }
     };
   }
 
@@ -335,6 +383,32 @@ export class AdaptiveRateLimiter {
     this.consecutiveErrors = 0;
     this.consecutiveSuccesses++;
     this.backoffMultiplier = Math.max(1, this.backoffMultiplier * 0.9);
+  }
+
+  /**
+   * Record a retry attempt for statistics tracking.
+   *
+   * @param successful - Whether the retry was successful
+   */
+  recordRetryAttempt(successful: boolean): void {
+    this.retryAttempts.push({
+      timestamp: Date.now(),
+      successful
+    });
+
+    // Keep only last 200 retry attempts to prevent unbounded growth
+    if (this.retryAttempts.length > 200) {
+      this.retryAttempts = this.retryAttempts.slice(-200);
+    }
+  }
+
+  /**
+   * Get the last received API headers for debugging.
+   *
+   * @returns The last received API headers
+   */
+  getLastHeaders(): ApiHeaders {
+    return { ...this.lastReceivedHeaders };
   }
 
   /**

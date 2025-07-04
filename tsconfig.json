@@ -18,7 +18,7 @@
   "exclude": ["**/*.spec.ts"],
   "include": [
     "./src/**/*",
-    "tmp/bad/exporter.test.ts",
+    "dump/bad/exporter.test.ts",
     "src/lib/export/exporter.ts",
     "src/lib/index.ts",
     "src/lib/export/config.ts"

@@ -6,13 +6,12 @@ Notion Sync is a tool for importing and exporting content to and from Notion.
 
 ## Key Features
 
-- ✅ Exports all workspace content recursively.
-- ✅ Saves as JSON files on disk.
-- ✅ 100% test coverage goal (6 core tests passing).
-- ✅ Rate limiting and error handling.
-- ✅ TypeScript with full type safety.
-- ✅ Configurable options.
-- ✅ CLI tool for easy usage.
+- 💯 Handles nested pages and blocks like a boss.
+- 💾 Export JSON, YAML, or Markdown to disk.
+- ⚡️ Dynamic rate limiting that starts aggressive and adapts based on API headers
+- 🔀 Operation-type-aware concurrency management with priority queuing
+- 📊 Real-time performance monitoring and statistics tracking
+- ✅ Comprehensive fault tolerance with fallback mechanisms
 
 ## Main Implementation (workspace-exporter.ts)
 

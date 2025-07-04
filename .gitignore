@@ -3,4 +3,4 @@ dist
 tmp
 node_modules
 **/notion-export*
-dumpster
+dump*

@@ -23,16 +23,20 @@ export class StreamProcessor {
 
     this.activeProcessors++;
     try {
-      switch (this.config.format) {
-        case "json":
-          await this.processJsonItem(item);
-          break;
-        case "markdown":
-          await this.processMarkdownItem(item);
-          break;
-        case "csv":
-          await this.processCsvItem(item);
-          break;
+      for (const format of this.config.format) {
+        switch (format) {
+          case "json":
+            await this.processJsonItem(item);
+            break;
+          case "markdown":
+            await this.processMarkdownItem(item);
+            break;
+          case "csv":
+            await this.processCsvItem(item);
+            break;
+          default:
+            throw new Error(`Unsupported format: ${format}`);
+        }
       }
       this.processedCount++;
     } finally {

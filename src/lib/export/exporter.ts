@@ -1,7 +1,7 @@
 import { ExporterConfig } from "$lib/export/config";
 import { CircuitBreaker, ConcurrencyLimiter, ProgressTracker, RateLimiter, delay, sumReducer } from "$lib/export/util";
 import type { OperationEventEmitter } from "$lib/operations";
-import { collectPaginatedAPI, iteratePaginatedAPI, retryOperation } from "$lib/operations";
+import { collectPaginatedAPI, iteratePaginatedAPI, retry } from "$lib/operations";
 import { APIErrorCode, Client, isNotionClientError } from "@notionhq/client";
 import type {
   BlockObjectResponse,
@@ -185,8 +185,10 @@ export class Exporter extends EventEmitter implements OperationEventEmitter {
     });
 
     // Initialize enhanced utilities
-    this.concurrencyLimiter = new ConcurrencyLimiter(Math.min(this.config.concurrency, 5)); // Reduce default concurrency
-    this.rateLimiter = new RateLimiter(30, this.config.rate); // 30 requests per minute with base interval
+    // Allow injected limiters or create default ones
+    this.concurrencyLimiter =
+      (this as any).concurrencyLimiter || new ConcurrencyLimiter(Math.min(this.config.concurrency, 5)); // Reduce default concurrency
+    this.rateLimiter = (this as any).rateLimiter || new RateLimiter(30, this.config.rate); // 30 requests per minute with base interval
     this.circuitBreaker = new CircuitBreaker(10, 300000); // Open after 10 failures, reset after 5 minutes
     this.progressTracker = new ProgressTracker();
   }
@@ -198,7 +200,7 @@ export class Exporter extends EventEmitter implements OperationEventEmitter {
    */
   private updateProgress(update: Partial<ExportProgress>) {
     this.progress = { ...this.progress, ...update };
-    this.emit("progress", `${this.progress}`);
+    this.emit("progress", this.progress);
   }
 
   /**
@@ -220,10 +222,10 @@ export class Exporter extends EventEmitter implements OperationEventEmitter {
         this.emit("resumed", this.progress);
       }
 
-      // Set up periodic progress saving (every 30 seconds)
+      // Set up periodic progress saving (every 5 seconds).
       progressSaveInterval = setInterval(() => {
         this.saveProgress();
-      }, 30000);
+      }, 5000);
 
       // Export workspace metadata.
       const workspaceInfo = await this.exportWorkspaceMetadata();
@@ -339,14 +341,25 @@ export class Exporter extends EventEmitter implements OperationEventEmitter {
       await this.rateLimiter.waitForSlot();
 
       // Get authenticated user info as proxy for workspace info.
-      const userInfo = await retryOperation(
-        () => this.client.users.me({}),
-        this.config.retries,
-        this.config.rate,
-        "workspace metadata",
-        this.config.timeout,
-        this
-      );
+      const startTime = Date.now();
+      const userInfo = await retry({
+        fn: () => this.client.users.me({}),
+        operation: "workspace metadata",
+        context: {
+          op: "read",
+          priority: "normal"
+        },
+        maxRetries: this.config.retries,
+        baseDelay: this.config.rate,
+        timeout: this.config.timeout,
+        emitter: this
+      });
+
+      // Track API response time
+      const responseTime = Date.now() - startTime;
+      if ((this as any).rateLimiter && typeof (this as any).rateLimiter.updateFromHeaders === "function") {
+        (this as any).rateLimiter.updateFromHeaders({}, responseTime, false);
+      }
 
       const workspaceInfo = {
         exportDate: new Date().toISOString(),
@@ -386,15 +399,19 @@ export class Exporter extends EventEmitter implements OperationEventEmitter {
   private async exportUsers(): Promise<number> {
     this.updateProgress({ currentOperation: "Exporting users" });
     try {
-      const users = await retryOperation(
-        () =>
+      const users = await retry({
+        fn: () =>
           collectPaginatedAPI(this.client.users.list.bind(this.client.users), {}, this.config.size, this.config.rate),
-        this.config.retries,
-        this.config.rate,
-        "export users",
-        this.config.timeout,
-        this
-      );
+        operation: "export users",
+        context: {
+          op: "read",
+          priority: "normal"
+        },
+        maxRetries: this.config.retries,
+        baseDelay: this.config.rate,
+        timeout: this.config.timeout,
+        emitter: this
+      });
 
       await fs.writeFile(path.join(this.config.output, "users", "all-users.json"), JSON.stringify(users, null, 2));
 
@@ -479,25 +496,68 @@ export class Exporter extends EventEmitter implements OperationEventEmitter {
             }
 
             try {
-              await delay(this.config.rate);
+              // Use injected concurrency limiter if available and supports OperationTypeAwareLimiter interface
+              if ((this.concurrencyLimiter as any).run && typeof (this.concurrencyLimiter as any).run === "function") {
+                return await (this.concurrencyLimiter as any).run(
+                  {
+                    type: "databases",
+                    objectId: database.id,
+                    operation: "export-database"
+                  },
+                  async () => {
+                    await delay(this.config.rate);
 
-              // Save database metadata.
-              await fs.writeFile(
-                path.join(this.config.output, "databases", `${database.id}.json`),
-                JSON.stringify(database, null, 2)
-              );
+                    // Save database metadata.
+                    await fs.writeFile(
+                      path.join(this.config.output, "databases", `${database.id}.json`),
+                      JSON.stringify(database, null, 2)
+                    );
 
-              // Export pages with retry.
-              const dbPages = await retryOperation(
-                () => this.exportDatabasePages(database.id),
-                this.config.retries,
-                this.config.rate,
-                `database ${database.id} pages`,
-                this.config.timeout * 2,
-                this
-              );
+                    // Export pages with retry.
+                    const dbPages = await retry({
+                      fn: () => this.exportDatabasePages(database.id),
+                      operation: `database ${database.id} pages`,
+                      context: {
+                        op: "read",
+                        priority: "normal"
+                      },
+                      maxRetries: this.config.retries,
+                      baseDelay: this.config.rate,
+                      timeout: this.config.timeout * 2,
+                      emitter: this
+                    });
 
-              return { dbCount: 1, pageCount: dbPages };
+                    return { dbCount: 1, pageCount: dbPages };
+                  }
+                );
+              } else {
+                // Fallback to original concurrency limiter
+                return await this.concurrencyLimiter.run(async () => {
+                  await delay(this.config.rate);
+
+                  // Save database metadata.
+                  await fs.writeFile(
+                    path.join(this.config.output, "databases", `${database.id}.json`),
+                    JSON.stringify(database, null, 2)
+                  );
+
+                  // Export pages with retry.
+                  const dbPages = await retry({
+                    fn: () => this.exportDatabasePages(database.id),
+                    operation: `database ${database.id} pages`,
+                    context: {
+                      op: "read",
+                      priority: "normal"
+                    },
+                    maxRetries: this.config.retries,
+                    baseDelay: this.config.rate,
+                    timeout: this.config.timeout * 2,
+                    emitter: this
+                  });
+
+                  return { dbCount: 1, pageCount: dbPages };
+                }, this.config.timeout);
+              }
             } catch (error) {
               this.handleError("database", database.id, error);
               return { dbCount: 0, pageCount: 0 };
@@ -563,18 +623,23 @@ export class Exporter extends EventEmitter implements OperationEventEmitter {
 
         try {
           // Query pages with pagination
-          const queryResult = await retryOperation(
-            () =>
+          const queryResult = await retry({
+            fn: () =>
               this.client.databases.query({
                 database_id: databaseId,
                 page_size: Math.min(this.config.size, 25), // Limit page size to reduce timeout risk
                 start_cursor: cursor
               }),
-            this.config.retries,
-            this.config.rate,
-            `database ${databaseId} pages query`,
-            this.config.timeout * 2 // Double timeout for database queries
-          );
+            operation: `database ${databaseId} pages query`,
+            context: {
+              op: "read",
+              priority: "normal"
+            },
+            maxRetries: this.config.retries,
+            baseDelay: this.config.rate,
+            timeout: this.config.timeout * 2, // Double timeout for database queries
+            emitter: this
+          });
 
           // Reset consecutive errors on success
           consecutiveErrors = 0;
@@ -712,22 +777,64 @@ export class Exporter extends EventEmitter implements OperationEventEmitter {
     await this.rateLimitDelay();
 
     try {
-      // Save page metadata
-      await fs.writeFile(path.join(this.config.output, "pages", `${page.id}.json`), JSON.stringify(page, null, 2));
+      // Track operation with OperationTypeAwareLimiter if available
+      if ((this as any).concurrencyLimiter && typeof (this as any).concurrencyLimiter.run === "function") {
+        await (this as any).concurrencyLimiter.run(
+          {
+            type: "pages",
+            objectId: page.id,
+            operation: "export-page"
+          },
+          async () => {
+            // Save page metadata
+            await fs.writeFile(
+              path.join(this.config.output, "pages", `${page.id}.json`),
+              JSON.stringify(page, null, 2)
+            );
 
-      // Export page properties separately if enabled
-      if (this.config.properties) {
-        await this.exportPageProperties(page);
+            // Export page properties separately if enabled
+            if (this.config.properties) {
+              await this.exportPageProperties(page);
+            }
+
+            // Export blocks with timeout
+            await retry({
+              fn: () => this.exportBlocks(page.id, 0),
+              operation: `blocks for page ${page.id}`,
+              context: {
+                op: "read",
+                priority: "normal"
+              },
+              maxRetries: this.config.retries,
+              baseDelay: this.config.rate,
+              timeout: this.config.timeout * 2, // Double timeout for blocks
+              emitter: this
+            });
+          }
+        );
+      } else {
+        // Fallback to original flow
+        // Save page metadata
+        await fs.writeFile(path.join(this.config.output, "pages", `${page.id}.json`), JSON.stringify(page, null, 2));
+
+        // Export page properties separately if enabled
+        if (this.config.properties) {
+          await this.exportPageProperties(page);
+        }
+
+        // Export blocks with timeout
+        await retry({
+          fn: () => this.exportBlocks(page.id, 0),
+          operation: `blocks for page ${page.id}`,
+          context: {
+            op: "read",
+            priority: "normal"
+          },
+          maxRetries: this.config.retries,
+          baseDelay: this.config.rate,
+          timeout: this.config.timeout * 2 // Double timeout for blocks
+        });
       }
-
-      // Export blocks with timeout
-      await retryOperation(
-        () => this.exportBlocks(page.id, 0),
-        this.config.retries,
-        this.config.rate,
-        `blocks for page ${page.id}`,
-        this.config.timeout * 2 // Double timeout for blocks
-      );
     } catch (error) {
       this.handleError("page", page.id, error);
     }
@@ -970,20 +1077,24 @@ ${
     await this.rateLimitDelay();
 
     try {
-      const blocks = await retryOperation(
-        () =>
+      const blocks = await retry({
+        fn: () =>
           collectPaginatedAPI(
             this.client.blocks.children.list.bind(this.client.blocks.children),
             { block_id: blockId },
             this.config.size,
             this.config.rate
           ),
-        this.config.retries,
-        this.config.rate,
-        `exporting child blocks for block id ${blockId}`,
-        this.config.timeout,
-        this
-      );
+        operation: `exporting child blocks for block id ${blockId}`,
+        context: {
+          op: "read",
+          priority: "normal"
+        },
+        maxRetries: this.config.retries,
+        baseDelay: this.config.rate,
+        timeout: this.config.timeout,
+        emitter: this
+      });
 
       // Save blocks for this parent.
       await fs.writeFile(
@@ -992,14 +1103,14 @@ ${
       );
 
       // Process child blocks in smaller batches.
-      const childBlocks = blocks.filter((block) => this.isFullBlock(block) && block.has_children);
+      const childBlocks = blocks.filter((block: any) => this.isFullBlock(block) && block.has_children);
       const batchSize = Math.min(5, this.config.concurrency);
 
       for (let i = 0; i < childBlocks.length; i += batchSize) {
         const batch = childBlocks.slice(i, i + batchSize);
         console.log(`Exporting ${batch.length} child blocks of ${blockId} at depth ${depth}`);
         await Promise.all(
-          batch.map((block) =>
+          batch.map((block: any) =>
             this.concurrencyLimiter.run(async () => {
               // This is where nested blocks are exported recursively.
               await this.exportBlocks(block.id, depth + 1);
@@ -1038,27 +1149,31 @@ ${
               try {
                 await this.rateLimitDelay();
 
-                const comments = await retryOperation(
-                  () =>
+                const comments = await retry({
+                  fn: () =>
                     collectPaginatedAPI(
                       this.client.comments.list.bind(this.client.comments),
                       { block_id: pageId },
                       this.config.size,
                       this.config.rate
                     ),
-                  1, // Only retry once for comments
-                  this.config.rate,
-                  `comments for ${pageId}`,
-                  this.config.timeout,
-                  this
-                );
+                  operation: `comments for ${pageId}`,
+                  context: {
+                    op: "read",
+                    priority: "normal"
+                  },
+                  maxRetries: 1, // Only retry once for comments
+                  baseDelay: this.config.rate,
+                  timeout: this.config.timeout,
+                  emitter: this
+                });
 
-                if (comments.length > 0) {
+                if (comments.length && comments.length > 0) {
                   await fs.writeFile(
                     path.join(this.config.output, "comments", `${pageId}-comments.json`),
                     JSON.stringify(comments, null, 2)
                   );
-                  return comments.length;
+                  return comments.length || 0;
                 }
                 return 0;
               } catch (error) {
@@ -1204,6 +1319,11 @@ ${
    * @returns A promise that resolves when the rate limiting delay is applied.
    */
   private async rateLimitDelay(): Promise<void> {
-    await this.rateLimiter.waitForSlot();
+    // Use injected rate limiter if available
+    if ((this as any).rateLimiter && typeof (this as any).rateLimiter.waitForSlot === "function") {
+      await (this as any).rateLimiter.waitForSlot();
+    } else {
+      await this.rateLimiter.waitForSlot();
+    }
   }
 }

@@ -5,9 +5,9 @@ export {
   NotionApiStreamer,
   OptimizedNotionExportCLI,
   StreamingExportManager
-} from "../../tmp/bad";
+} from "../../dump/bad";
 
-export type { ExportItem, OptimizedExportConfig, StreamingExportConfig } from "../../tmp/bad";
+export type { ExportItem, OptimizedExportConfig, StreamingExportConfig } from "../../dump/bad";
 
 // Export individual utility modules (but not the ones already exported from ./export)
 export {
@@ -30,7 +30,7 @@ export { OperationTypeAwareLimiter } from "./export/concurrency-manager";
 
 export type { OperationContext, OperationStats, OperationType } from "./export/concurrency-manager";
 
-export { collectPaginatedAPI, iteratePaginatedAPI, retryOperation, smartRetryOperation } from "./operations";
+export { collectPaginatedAPI, iteratePaginatedAPI, retry as retryOperation, smartRetryOperation } from "./operations";
 
 export type { OperationEventEmitter, RetryContext } from "./operations";
 

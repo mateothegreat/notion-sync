@@ -255,7 +255,7 @@ export class StreamingExportManager implements OperationEventEmitter {
     await this.rateLimiter.waitForSlot();
 
     const context: RetryContext = {
-      operationType: operationType === "pages" || operationType === "databases" ? "read" : "read",
+      op: operationType === "pages" || operationType === "databases" ? "read" : "read",
       circuitBreaker: this.circuitBreaker,
       objectId,
       priority: "normal"

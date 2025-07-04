@@ -18,19 +18,19 @@
   },
   "devDependencies": {
     "@notionhq/client": "^4.0.0",
+    "@oclif/core": "^4.4.1",
     "@oclif/test": "^4.1.13",
     "@types/node": "^24.0.10",
-    "ora": "^8.2.0",
-    "ts-node": "^10.9.2",
     "@vitest/coverage-v8": "^3.2.4",
     "@vitest/ui": "^3.2.4",
+    "chalk": "^5.4.1",
+    "dotenv": "^17.0.1",
+    "ora": "^8.2.0",
+    "ts-node": "^10.9.2",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^3.2.4",
-    "@oclif/core": "^4.4.0",
-    "chalk": "^5.4.1",
-    "dotenv": "^17.0.1"
+    "vitest": "^3.2.4"
   },
   "bin": {
     "notion-sync": "./bin/run.js"
@@ -46,5 +46,8 @@
         "./dist/hooks/init"
       ]
     }
+  },
+  "dependencies": {
+    "c12": "^3.0.4"
   }
 }

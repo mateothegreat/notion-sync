@@ -4,7 +4,7 @@ import { CircuitBreaker, delay } from "./export/util";
 import {
   collectPaginatedAPI,
   iteratePaginatedAPI,
-  retryOperation,
+  retry,
   smartRetryOperation,
   type OperationEventEmitter,
   type RetryContext
@@ -19,7 +19,7 @@ describe("operations", () => {
 
     beforeEach(() => {
       mockOperation = vi.fn();
-      context = { operationType: "read" };
+      context = { op: "read" };
       emittedEvents = [];
       eventEmitter = {
         emit: (event: string, data: any) => {
@@ -73,8 +73,8 @@ describe("operations", () => {
     });
 
     it("should adjust retry policy based on operation type", async () => {
-      const writeContext: RetryContext = { operationType: "write" };
-      const readContext: RetryContext = { operationType: "read" };
+      const writeContext: RetryContext = { op: "write" };
+      const readContext: RetryContext = { op: "read" };
 
       mockOperation.mockRejectedValue({ code: APIErrorCode.RateLimited });
 
@@ -127,7 +127,7 @@ describe("operations", () => {
 
     it("should handle priority in retry delays", async () => {
       const highPriorityContext: RetryContext = {
-        operationType: "read",
+        op: "read",
         priority: "high"
       };
 
@@ -174,7 +174,7 @@ describe("operations", () => {
     it("should delegate to smartRetryOperation", async () => {
       const mockOperation = vi.fn().mockResolvedValue("success");
 
-      const result = await retryOperation(mockOperation, 3, 100, "test-op", 1000);
+      const result = await retry(mockOperation, 3, 100, "test-op", 1000);
 
       expect(result).toBe("success");
       expect(mockOperation).toHaveBeenCalledTimes(1);

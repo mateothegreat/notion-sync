@@ -1,3 +1,4 @@
+import { getObjects } from "$lib/objects/types";
 import { Flags } from "@oclif/core";
 
 export const baseFlags = {
@@ -12,5 +13,18 @@ export const baseFlags = {
     },
     env: "NOTION_TOKEN",
     required: true
+  }),
+  flush: Flags.boolean({
+    description: "Flush stdout after each log instead of updating in place",
+    default: false
+  }),
+  timeout: Flags.integer({
+    description: "Max run time in seconds",
+    default: 0
+  }),
+  objects: Flags.string({
+    description: "Objects to export",
+    options: getObjects(),
+    multiple: true
   })
 };

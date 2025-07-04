@@ -1,3 +1,4 @@
+import { Format } from "$lib/renderers/format";
 import type { ExportCheckpoint } from "../progress-tracking";
 import { PersistentProgressTracker } from "../progress-tracking";
 import { NotionApiStreamer } from "./notion-api-streamer";
@@ -8,7 +9,7 @@ export interface StreamingExportConfig {
   maxMemoryMB: number;
   chunkSize: number;
   concurrency: number;
-  format: "json" | "markdown" | "csv";
+  format: Format[];
   outputPath: string;
 }
 
@@ -37,7 +38,7 @@ export class StreamingExportManager {
     maxMemoryBytes: number = 256 * 1024 * 1024, // 256MB default
     checkpointInterval: number = 30000, // 30s default
     customConcurrency?: Partial<Record<string, number>>,
-    format: "json" | "markdown" | "csv" = "json"
+    format: Format[] = ["json"]
   ) {
     this.config = {
       maxMemoryMB: maxMemoryBytes / (1024 * 1024),

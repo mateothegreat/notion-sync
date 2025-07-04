@@ -378,7 +378,7 @@ export class NotionExportManager {
     await this.rateLimiter.waitForSlot();
 
     const context: RetryContext = {
-      operationType: "read",
+      op: "read",
       circuitBreaker: this.circuitBreaker
     };
 

@@ -1,11 +1,6 @@
-import Export from "$lib/bad/export";
-import { InferredFlags } from "@oclif/core/interfaces";
-import { getDateString } from "./util";
+import { ObjectType } from "$lib/objects/types";
 
-/**
- * Configuration options for the workspace exporter.
- */
-export class ExporterConfig {
+export class BaseConfig {
   /**
    * Notion API integration token.
    */
@@ -15,11 +10,6 @@ export class ExporterConfig {
    * Directory where exported data will be saved.
    */
   output?: string;
-
-  /**
-   * Whether to include archived pages and databases.
-   */
-  archived?: boolean;
 
   /**
    * Number of concurrent operations (default: 10).
@@ -32,9 +22,14 @@ export class ExporterConfig {
   depth?: number;
 
   /**
-   * Whether to include comments on pages.
+   * Maximum number of retries for failed operations (default: 3).
    */
-  comments?: boolean;
+  retries?: number;
+
+  /**
+   * Operation timeout in milliseconds (default: 30000).
+   */
+  timeout?: number;
 
   /**
    * Custom rate limit delay in milliseconds (default: 100).
@@ -42,14 +37,40 @@ export class ExporterConfig {
   rate?: number;
 
   /**
+   * Objects to export.
+   */
+  objects?: ObjectType[];
+
+  constructor(config: BaseConfig) {
+    this.token = config.token;
+    this.output = config.output;
+    this.concurrency = config.concurrency;
+    this.depth = config.depth;
+    this.retries = config.retries;
+    this.timeout = config.timeout;
+    this.rate = config.rate;
+    this.objects = config.objects as ObjectType[];
+  }
+}
+
+/**
+ * Configuration options for the workspace exporter.
+ */
+export class ExporterConfig extends BaseConfig {
+  /**
+   * Whether to include archived pages and databases.
+   */
+  archived?: boolean;
+
+  /**
+   * Whether to include comments on pages.
+   */
+  comments?: boolean;
+
+  /**
    * Page size for pagination (default: 10).
    */
   size?: number;
-
-  /**
-   * Maximum number of retries for failed operations (default: 3).
-   */
-  retries?: number;
 
   /**
    * Whether to export page properties separately (default: true).
@@ -57,21 +78,15 @@ export class ExporterConfig {
   properties?: boolean;
 
   /**
-   * Operation timeout in milliseconds (default: 30000).
+   * Constructor for the ExporterConfig class.
+   *
+   * @param config - The configuration object.
    */
-  timeout?: number;
-
-  constructor(config: InferredFlags<typeof Export.flags> | Partial<ExporterConfig>) {
-    this.token = config.token ?? process.env.NOTION_TOKEN;
-    this.output = config.output ?? `./notion-export-${getDateString()}`;
-    this.archived = config.archived ?? true;
-    this.concurrency = config.concurrency ?? 10;
-    this.comments = config.comments ?? true;
-    this.depth = config.depth ?? 10;
-    this.rate = config.rate ?? 100;
-    this.size = config.size ?? 10;
-    this.retries = config.retries ?? 3;
-    this.properties = config.properties ?? true;
-    this.timeout = config.timeout ?? 30_000;
+  constructor(config: ExporterConfig) {
+    super(config);
+    this.archived = config.archived;
+    this.comments = config.comments;
+    this.properties = config.properties;
+    this.size = config.size;
   }
 }
