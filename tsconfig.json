@@ -15,7 +15,7 @@
       "$lib/*": ["./src/lib/*"]
     }
   },
-  "exclude": ["**/*.spec.ts"],
+  "exclude": ["**/*.test.ts"],
   "include": [
     "./src/**/*",
     "dump/bad/exporter.test.ts",
