@@ -300,20 +300,20 @@ export class BrokerBus {
   channel<T>(name: string): Subject<T> {
     const subject = new Subject<T>();
     
-    // Set up bidirectional communication
+    // Set up subscription from bus to subject (one-way)
     this.bus.subscribe(name, (message) => {
       subject.next(message.payload);
     }).catch(error => {
       console.error(`Error setting up channel subscription for ${name}:`, error);
     });
 
-    // Override next to publish to bus
+    // Override next to publish to bus only (don't emit locally to avoid loop)
     const originalNext = subject.next.bind(subject);
     subject.next = (value: T) => {
       this.bus.publish(name, value).catch(error => {
         console.error(`Error publishing to channel ${name}:`, error);
       });
-      originalNext(value);
+      // Don't call originalNext here to avoid feedback loop
     };
 
     return subject;
