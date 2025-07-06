@@ -5,7 +5,7 @@
  */
 
 // Control Plane exports
-export { BrokerBus, ControlPlane, InMemoryAdapter, MessageBus, createControlPlane } from "./lib/control-plane";
+export { BrokerBus, ControlPlane, createControlPlane, InMemoryAdapter, MessageBus } from "./lib/control-plane";
 
 // Domain exports
 export { Export, ExportFactory } from "./core/domain/export";
@@ -36,6 +36,32 @@ export * from "./shared/errors";
 
 // Library exports
 export * from "./lib";
+
+// New Exporter
+import { config } from "./lib/config-loader";
+import { ExporterConfig } from "./lib/export/config";
+import { NewExporter } from "./lib/export/new_exporter";
+
+async function testExport() {
+  const exporterConfig: ExporterConfig = {
+    token: config.token || "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",
+    output: "./exports",
+    concurrency: 5,
+    rate: 3,
+    timeout: 30000,
+    retries: 3,
+    depth: 2,
+    comments: false,
+    archived: false,
+    properties: false
+  };
+
+  const exporter = new NewExporter(exporterConfig);
+  const result = await exporter.export();
+  console.log("Export Result:", result);
+}
+
+testExport();
 
 // Default configuration factory
 export function createDefaultConfig(apiKey: string, outputPath: string = "./exports") {

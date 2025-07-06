@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import { join } from "path";
 import { RateTracker } from "./export/util";
+import { log } from "./log";
 
 /**
  * Export checkpoint data for resumable operations.
@@ -126,7 +127,7 @@ export class PersistentProgressTracker {
 
       this.isDirty = false;
     } catch (error) {
-      console.error("Failed to save checkpoint:", error);
+      log.error("Failed to save checkpoint", { error });
       throw error;
     }
   }
@@ -361,10 +362,7 @@ export class ProgressReporter {
   private lastReportTime = 0;
   private reportInterval: number;
 
-  constructor(
-    private tracker: PersistentProgressTracker,
-    reportInterval: number = 5000
-  ) {
+  constructor(private tracker: PersistentProgressTracker, reportInterval: number = 5000) {
     this.reportInterval = reportInterval;
   }
 

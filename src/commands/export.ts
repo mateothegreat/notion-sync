@@ -3,6 +3,7 @@
  *
  * CLI command for exporting Notion content using the new event-driven architecture
  */
+import { log } from "$lib/log";
 import chalk from "chalk";
 import { promises as fs } from "fs";
 import path from "path";
@@ -97,7 +98,7 @@ export default class Export extends BaseCommand<typeof Export> {
       this.log(`📁 Files saved to: ${chalk.yellow(outputPath)}`);
     } catch (error) {
       if (flags.verbose) {
-        console.log(inspect(error, { colors: true, compact: false }));
+        log.error("Export error details", { error: inspect(error, { colors: true, compact: false }) });
       }
 
       if (error instanceof Error) {

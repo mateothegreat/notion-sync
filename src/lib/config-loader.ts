@@ -302,7 +302,7 @@ export const createConfigSchema = () => {
     for (const variant of parseables[name].variants) {
       if (parseables[name].debug) {
         schema[name] = z4.preprocess((value) => {
-          console.log("🔍 Inspecting:", name, value);
+          log.debug("Config inspection", { name, value });
           return value;
         }, parseables[name].schema().optional());
       } else {

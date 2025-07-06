@@ -1,0 +1,108 @@
+# Default test configuration for test suites.
+# This YAML file provides default values that can be overridden by environment-specific configurations.
+timeouts:
+  notion-client: 60000
+  notion-api: 60000
+  notion-api-rate-limit: 60000
+  notion-api-rate-limit-hit: 60000
+  notion-api-rate-limit-hit-rate: 60000
+  config-validation: 10000
+  export-service: 30000
+  progress-service: 15000
+  control-plane: 20000
+  integration: 120000
+
+env:
+  NODE_ENV: test
+  LOG_LEVEL: error
+
+config:
+  notion:
+    apiKey: test-key
+    apiVersion: "2022-06-28"
+    baseUrl: https://api.notion.com
+    timeout: 30000
+    retryAttempts: 3
+
+  export:
+    defaultOutputPath: ./test-exports
+    defaultFormat: json
+    maxConcurrency: 5
+    chunkSize: 100
+    enableResume: true
+    maxDepth: 3
+    includeArchived: false
+
+  performance:
+    rateLimits:
+      pages: 10
+      blocks: 15
+      databases: 5
+      comments: 8
+      users: 3
+      properties: 20
+    circuitBreaker:
+      failureThreshold: 5
+      resetTimeout: 60000
+      monitoringPeriod: 60000
+    caching:
+      enabled: false
+      ttl: 300000
+      maxSize: 1000
+
+groups:
+  notion:
+    name: Notion API Tests
+    description: Tests for Notion API client and related functionality
+    tests:
+      config:
+        name: Configuration validation
+        timeout: 10000
+        env: {}
+        config: {}
+        tags:
+          - config
+          - validation
+      client:
+        name: Notion client operations
+        timeout: 60000
+        env: {}
+        config: {}
+        tags:
+          - notion
+          - client
+
+  export:
+    name: Export Service Tests
+    description: Tests for export functionality and services
+    tests:
+      service:
+        name: Export service operations
+        timeout: 30000
+        env: {}
+        config: {}
+        tags:
+          - export
+          - service
+      progress:
+        name: Progress tracking
+        timeout: 15000
+        env: {}
+        config: {}
+        tags:
+          - progress
+          - tracking
+
+  integration:
+    name: Integration Tests
+    description: End-to-end integration tests
+    tests:
+      fullExport:
+        name: Complete export workflow
+        timeout: 120000
+        env:
+          INTEGRATION_TEST: "true"
+        config: {}
+        tags:
+          - integration
+          - e2e

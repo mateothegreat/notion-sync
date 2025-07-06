@@ -12,6 +12,7 @@ import type { OperationEventEmitter } from "../operations";
 import { collectPaginatedAPI, iteratePaginatedAPI, retry } from "../operations";
 import { ExporterConfig } from "./config";
 import { CircuitBreaker, ConcurrencyLimiter, ProgressTracker, RateLimiter, delay, sumReducer } from "./util";
+import { WorkspaceMetadataExporter } from "./workspace-metadata-exporter";
 
 declare global {
   interface Date {
@@ -33,7 +34,7 @@ export interface ExportProgress {
     pagesPerSecond: number;
     blocksPerSecond: number;
     databasesPerSecond: number;
-    commentsPerSecond: number;
+    commentsPerSecond: number
   };
   startTime: Date;
 }
@@ -229,7 +230,8 @@ export class Exporter extends EventEmitter implements OperationEventEmitter {
       }, 5000);
 
       // Export workspace metadata.
-      const workspaceInfo = await this.exportWorkspaceMetadata();
+      const workspaceMetadataExporter = new WorkspaceMetadataExporter(this.config, this);
+      const workspaceInfo = await workspaceMetadataExporter.export();
 
       // Execute exports in parallel where possible.
       const [usersCount, databasesResult] = await Promise.all([
@@ -318,80 +320,6 @@ export class Exporter extends EventEmitter implements OperationEventEmitter {
     await Promise.all(dirs.map((dir) => fs.mkdir(dir, { recursive: true })));
 
     log.info("Created output directory structure", { dirs });
-  }
-
-  /**
-   * Export workspace metadata.
-   *
-   * @returns A promise that resolves when the workspace metadata is exported.
-   */
-  private async exportWorkspaceMetadata(): Promise<any> {
-    this.updateProgress({ currentOperation: "Exporting workspace metadata" });
-
-    // Check circuit breaker
-    if (!this.circuitBreaker.canProceed()) {
-      this.emit("debug", "Circuit breaker is open, skipping workspace metadata export");
-      this.emit("circuit-breaker", { state: "open", operation: "workspace metadata" });
-      return null;
-    }
-
-    try {
-      // Apply rate limiting
-      const waitTime = await this.rateLimiter.getWaitTime();
-      if (waitTime > 0) {
-        this.emit("rate-limit", { waitTime });
-      }
-      await this.rateLimiter.waitForSlot();
-
-      // Get authenticated user info as proxy for workspace info.
-      const startTime = Date.now();
-      const userInfo = await retry({
-        fn: () => this.client.users.me({}),
-        operation: "workspace metadata",
-        context: {
-          op: "read",
-          priority: "normal"
-        },
-        maxRetries: this.config.retries,
-        baseDelay: this.config.rate,
-        timeout: this.config.timeout,
-        emitter: this
-      });
-
-      // Track API response time
-      const responseTime = Date.now() - startTime;
-      if ((this as any).rateLimiter && typeof (this as any).rateLimiter.updateFromHeaders === "function") {
-        (this as any).rateLimiter.updateFromHeaders({}, responseTime, false);
-      }
-
-      const workspaceInfo = {
-        exportDate: new Date().toISOString(),
-        exportVersion: "1.0.0",
-        user: userInfo,
-        settings: {
-          includeArchived: this.config.archived,
-          includeComments: this.config.comments,
-          maxDepth: this.config.depth
-        }
-      };
-
-      await fs.writeFile(
-        path.join(this.config.output, "metadata", "workspace-info.json"),
-        JSON.stringify(workspaceInfo, null, 2)
-      );
-
-      this.rateLimiter.reportSuccess();
-      this.circuitBreaker.reportSuccess();
-      return workspaceInfo;
-    } catch (error) {
-      this.rateLimiter.reportError();
-      this.circuitBreaker.reportFailure();
-      if (this.circuitBreaker.getState() === "open") {
-        this.emit("circuit-breaker", { state: "open", operation: "workspace metadata" });
-      }
-      this.handleError("workspace-metadata", undefined, error);
-      return null;
-    }
   }
 
   /**
@@ -885,7 +813,7 @@ export class Exporter extends EventEmitter implements OperationEventEmitter {
    *
    * @returns The formatted property value.
    */
-  private formatProperty(property: any, pageId: string): any {
+  private async formatProperty(property: any, pageId: string): Promise<any> {
     if (!property) return null;
 
     try {
@@ -993,7 +921,7 @@ export class Exporter extends EventEmitter implements OperationEventEmitter {
       statistics: {
         users: stats.usersCount,
         databases: stats.databasesCount,
-        pages: stats.pagesCount,
+        pagesCount: stats.pagesCount,
         blocks: stats.blocksCount,
         comments: stats.commentsCount,
         files: stats.filesCount
@@ -1110,224 +1038,4 @@ ${
       const childBlocks = blocks.filter((block: any) => this.isFullBlock(block) && block.has_children);
       const batchSize = Math.min(5, this.config.concurrency);
 
-      for (let i = 0; i < childBlocks.length; i += batchSize) {
-        const batch = childBlocks.slice(i, i + batchSize);
-        console.log(`Exporting ${batch.length} child blocks of ${blockId} at depth ${depth}`);
-        await Promise.all(
-          batch.map((block: any) =>
-            this.concurrencyLimiter.run(async () => {
-              // This is where nested blocks are exported recursively.
-              await this.exportBlocks(block.id, depth + 1);
-            }, this.config.timeout)
-          )
-        );
-      }
-    } catch (error) {
-      this.handleError("blocks", blockId, error);
-    }
-  }
-
-  /**
-   * Export comments from all pages with parallel processing
-   *
-   * @returns The number of comments exported.
-   */
-  private async exportComments(): Promise<number> {
-    this.updateProgress({ currentOperation: "Exporting comments" });
-    let totalCount = 0;
-
-    try {
-      const pageFiles = await fs.readdir(path.join(this.config.output, "pages"));
-
-      const pageIds = pageFiles.filter((file) => file.endsWith(".json")).map((file) => file.replace(".json", ""));
-
-      // Process comments in smaller batches
-      const batchSize = Math.min(10, this.config.concurrency);
-
-      for (let i = 0; i < pageIds.length; i += batchSize) {
-        const batch = pageIds.slice(i, i + batchSize);
-
-        const results = await Promise.all(
-          batch.map((pageId) =>
-            this.concurrencyLimiter.run(async () => {
-              try {
-                await this.rateLimitDelay();
-
-                const comments = await retry({
-                  fn: () =>
-                    collectPaginatedAPI(
-                      this.client.comments.list.bind(this.client.comments),
-                      { block_id: pageId },
-                      this.config.size,
-                      this.config.rate
-                    ),
-                  operation: `comments for ${pageId}`,
-                  context: {
-                    op: "read",
-                    priority: "normal"
-                  },
-                  maxRetries: 1, // Only retry once for comments
-                  baseDelay: this.config.rate,
-                  timeout: this.config.timeout,
-                  emitter: this
-                });
-
-                if (comments.length && comments.length > 0) {
-                  await fs.writeFile(
-                    path.join(this.config.output, "comments", `${pageId}-comments.json`),
-                    JSON.stringify(comments, null, 2)
-                  );
-                  return comments.length || 0;
-                }
-                return 0;
-              } catch (error) {
-                // Comments might not be available for all pages
-                if (!this.isNotFoundError(error)) {
-                  this.handleError("comments", pageId, error);
-                }
-                return 0;
-              }
-            }, this.config.timeout)
-          )
-        );
-
-        totalCount += results.reduce(sumReducer, 0);
-      }
-    } catch (error) {
-      this.handleError("comments", undefined, error);
-    }
-
-    this.updateProgress({ commentsCount: totalCount });
-    return totalCount;
-  }
-
-  /**
-   * Type guard for full page objects
-   *
-   * @param page - The page to check.
-   *
-   * @returns True if the page is full, false otherwise.
-   */
-  private isFullPage(page: any): page is PageObjectResponse {
-    return page.object === "page" && "created_time" in page;
-  }
-
-  /**
-   * Type guard for full database objects
-   *
-   * @param database - The database to check.
-   *
-   * @returns True if the database is full, false otherwise.
-   */
-  private isFullDatabase(database: any): database is DatabaseObjectResponse {
-    return database.object === "database" && "created_time" in database;
-  }
-
-  /**
-   * Type guard for full block objects
-   *
-   * @param block - The block to check.
-   *
-   * @returns True if the block is full, false otherwise.
-   */
-  private isFullBlock(block: any): block is BlockObjectResponse {
-    return block.object === "block" && "created_time" in block;
-  }
-
-  /**
-   * Check if error is a not found error
-   *
-   * @param error - The error to check.
-   *
-   * @returns True if the error is a not found error, false otherwise.
-   */
-  private isNotFoundError(error: unknown): boolean {
-    return isNotionClientError(error) && error.code === APIErrorCode.ObjectNotFound;
-  }
-
-  /**
-   * Handle and log errors.
-   *
-   * @param type - The type of error.
-   * @param id - The ID of the error.
-   * @param error - The error to handle.
-   */
-  private handleError(type: string, id: string | undefined, error: unknown): void {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    this.errors.push({ type, id, error: errorMessage });
-    this.emit("debug", `Error exporting ${type}${id ? ` (${id})` : ""}: ${errorMessage}`);
-  }
-
-  /**
-   * Save progress to a file for resumability.
-   *
-   * @returns A promise that resolves when progress is saved.
-   */
-  private async saveProgress(): Promise<void> {
-    try {
-      const progressData = {
-        ...this.progressTracker.toJSON(),
-        exportedBlockIds: Array.from(this.exportedBlockIds),
-        exportedPageIds: Array.from(this.exportedPageIds),
-        progress: this.progress,
-        errors: this.errors,
-        timestamp: new Date().toISOString()
-      };
-
-      await fs.writeFile(path.join(this.config.output, "export-progress.json"), JSON.stringify(progressData, null, 2));
-    } catch (error) {
-      this.emit("debug", `Failed to save progress: ${error}`);
-    }
-  }
-
-  /**
-   * Load progress from a file for resuming.
-   *
-   * @returns A promise that resolves when progress is loaded.
-   */
-  private async loadProgress(): Promise<boolean> {
-    try {
-      const progressFile = path.join(this.config.output, "export-progress.json");
-      const exists = await fs
-        .access(progressFile)
-        .then(() => true)
-        .catch(() => false);
-
-      if (!exists) {
-        return false;
-      }
-
-      const data = await fs.readFile(progressFile, "utf-8");
-      const progressData = JSON.parse(data);
-
-      // Restore progress
-      this.progressTracker.fromJSON(progressData);
-      this.exportedBlockIds = new Set(progressData.exportedBlockIds || []);
-      this.exportedPageIds = new Set(progressData.exportedPageIds || []);
-      this.progress = progressData.progress || this.progress;
-      this.errors = progressData.errors || [];
-
-      this.emit("debug", `Resuming from previous export (${progressData.timestamp})`);
-      this.emit("debug", `Already exported: ${this.exportedPageIds.size} pages, ${this.exportedBlockIds.size} blocks`);
-
-      return true;
-    } catch (error) {
-      this.emit("debug", `Failed to load progress: ${error}`);
-      return false;
-    }
-  }
-
-  /**
-   * Rate limiting delay.
-   *
-   * @returns A promise that resolves when the rate limiting delay is applied.
-   */
-  private async rateLimitDelay(): Promise<void> {
-    // Use injected rate limiter if available
-    if ((this as any).rateLimiter && typeof (this as any).rateLimiter.waitForSlot === "function") {
-      await (this as any).rateLimiter.waitForSlot();
-    } else {
-      await this.rateLimiter.waitForSlot();
-    }
-  }
-}
+      for (let
