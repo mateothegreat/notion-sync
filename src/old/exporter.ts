@@ -1038,4 +1038,19 @@ ${
       const childBlocks = blocks.filter((block: any) => this.isFullBlock(block) && block.has_children);
       const batchSize = Math.min(5, this.config.concurrency);
 
-      for (let
+      for (let i = 0; i < childBlocks.length; i += batchSize) {
+        const batch = childBlocks.slice(i, i + batchSize);
+        await Promise.all(
+          batch.map((block: any) => this.exportBlocks(block.id))
+        );
+      }
+    } catch (error) {
+      this.emit("error", {
+        operation: `exporting child blocks for block id ${blockId}`,
+        error: error instanceof Error ? error.message : String(error),
+        context: { blockId }
+      });
+      throw error;
+    }
+  }
+}

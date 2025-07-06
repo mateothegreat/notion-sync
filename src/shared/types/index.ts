@@ -254,3 +254,17 @@ export interface LoggingConfig {
   outputs: ("console" | "file")[];
   filePath?: string;
 }
+
+// File System Configuration
+export interface FileSystemConfig {
+  baseOutputPath: string;
+  maxFileSize: number;
+  enableCompression: boolean;
+  compressionLevel: number;
+  enableAtomicOperations: boolean;
+  enableBackup: boolean;
+  namingStrategy: 'id' | 'title' | 'slug' | 'timestamp';
+  organizationStrategy: 'flat' | 'hierarchical' | 'by-type' | 'by-date';
+  encoding: 'utf8' | 'utf16le' | 'ascii';
+  enableChecksums: boolean;
+}

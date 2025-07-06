@@ -13,6 +13,7 @@ import { compileConfig, Config, config as configLoaded, createCommandFlags } fro
 import { ExportService } from "../core/services/export-service";
 import { ProgressService } from "../core/services/progress-service";
 import { NotionClient } from "../infrastructure/notion/notion-client";
+import { FileSystemManager } from "../infrastructure/filesystem/file-system-manager";
 import { BaseCommand } from "../lib/commands/base-command";
 import { ControlPlane, createControlPlane } from "../lib/control-plane/control-plane";
 import { ExportConfiguration, ExportFormat, NotionConfig } from "../shared/types";
@@ -36,6 +37,7 @@ export default class Export extends BaseCommand<typeof Export> {
   private exportService?: ExportService;
   private progressService?: ProgressService;
   private notionClient?: NotionClient;
+  private fileSystemManager?: FileSystemManager;
   private resolvedConfig: any;
 
   public async run(): Promise<void> {
@@ -172,6 +174,13 @@ export default class Export extends BaseCommand<typeof Export> {
      */
     const exportRepository = this.createInMemoryExportRepository();
     this.exportService = new ExportService(exportRepository, eventPublisher);
+
+    /**
+     * Create file system manager.
+     * This handles all file writing operations with proper organization and atomic operations.
+     */
+    const fileSystemConfig = FileSystemManager.createDefaultConfig(this.resolvedConfig.path);
+    this.fileSystemManager = new FileSystemManager(fileSystemConfig, eventPublisher);
 
     this.log("✅ Services initialized successfully");
   }
@@ -414,12 +423,35 @@ export default class Export extends BaseCommand<typeof Export> {
   }
 
   /**
-   * Write data to output file.
+   * Write data to output file using the new file system manager.
    */
   private async writeToOutput(data: any, type: string): Promise<void> {
-    // For now, we'll just log the data.
-    // In a real implementation, this would write to files based on the format.
-    this.log(`📄 Exported ${type}: ${data.id}`);
+    if (!this.fileSystemManager) {
+      throw new Error('File system manager not initialized');
+    }
+
+    try {
+      const format = this.resolvedConfig.format;
+      let filePath: string;
+
+      switch (type) {
+        case 'database':
+          filePath = await this.fileSystemManager.writeDatabase(data, format);
+          break;
+        
+        case 'page':
+          filePath = await this.fileSystemManager.writePage(data, format);
+          break;
+        
+        default:
+          throw new Error(`Unknown data type: ${type}`);
+      }
+
+      this.log(`📄 Exported ${type}: ${data.id} → ${filePath}`);
+    } catch (error) {
+      this.log(`❌ Failed to write ${type} ${data.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw error;
+    }
   }
 
   /**
