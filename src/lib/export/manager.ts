@@ -1,3 +1,4 @@
+import { log } from "$lib/log";
 import { createWriteStream, WriteStream } from "fs";
 import { join } from "path";
 import { smartRetryOperation, type OperationEventEmitter, type RetryContext } from "../operations";
@@ -149,6 +150,7 @@ export class StreamingExportManager implements OperationEventEmitter {
     sectionName: string,
     operationType: OperationType
   ): AsyncGenerator<any, void, unknown> {
+    log.trace("Streaming export items", { sectionName, operationType });
     this.currentCheckpoint.currentSection = sectionName;
     this.progressTracker.updateProgress(sectionName, 0);
 

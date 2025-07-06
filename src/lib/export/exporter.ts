@@ -1,3 +1,4 @@
+import { log } from "$lib/log";
 import { APIErrorCode, Client, isNotionClientError } from "@notionhq/client";
 import type {
   BlockObjectResponse,
@@ -315,6 +316,8 @@ export class Exporter extends EventEmitter implements OperationEventEmitter {
     ];
 
     await Promise.all(dirs.map((dir) => fs.mkdir(dir, { recursive: true })));
+
+    log.info("Created output directory structure", { dirs });
   }
 
   /**
@@ -463,6 +466,7 @@ export class Exporter extends EventEmitter implements OperationEventEmitter {
         this.config.size,
         this.config.rate
       )) {
+        log.debug("Found database", { db });
         if (this.isFullDatabase(db)) {
           databases.push(db);
           this.emit("debug", `Found database: ${db.id}`);
