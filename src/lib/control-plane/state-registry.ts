@@ -1,12 +1,12 @@
 /**
  * State Registry Implementation
- * 
+ *
  * Provides both mutable and immutable state management with notifications
  */
 
-import { produce, Draft } from 'immer';
-import { BehaviorSubject, Observable, Subject } from 'rxjs';
-import { StateChange } from './types';
+import { produce, Draft } from "immer";
+import { BehaviorSubject, Observable, Subject } from "rxjs";
+import { StateChange } from "./types";
 
 /**
  * State container interface
@@ -147,7 +147,7 @@ export class StateRegistry {
     this.containers.set(key, container);
 
     // Subscribe to changes for global notifications
-    container.onChange().subscribe(change => {
+    container.onChange().subscribe((change) => {
       this.globalChangeSubject.next(change);
     });
 
@@ -166,7 +166,7 @@ export class StateRegistry {
     this.containers.set(key, container);
 
     // Subscribe to changes for global notifications
-    container.onChange().subscribe(change => {
+    container.onChange().subscribe((change) => {
       this.globalChangeSubject.next(change);
     });
 
@@ -254,7 +254,7 @@ export class StateSelector<T, R> {
     const initialResult = this.selector(this.container.get());
     this.resultSubject.next(initialResult);
 
-    this.container.subscribe(state => {
+    this.container.subscribe((state) => {
       const newResult = this.selector(state);
       const currentResult = this.resultSubject.value;
 
@@ -265,7 +265,7 @@ export class StateSelector<T, R> {
   }
 
   subscribe(observer: (value: R) => void): { unsubscribe: () => void } {
-    const subscription = this.resultSubject.subscribe(value => {
+    const subscription = this.resultSubject.subscribe((value) => {
       if (value !== undefined) {
         observer(value);
       }
@@ -282,7 +282,7 @@ export class StateSelector<T, R> {
 
   private shouldUpdate(current: R | undefined, next: R): boolean {
     if (current === undefined) return true;
-    
+
     if (this.equalityFn) {
       return !this.equalityFn(current, next);
     }

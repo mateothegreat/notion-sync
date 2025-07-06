@@ -2,7 +2,13 @@ import { EventEmitter } from "events";
 import { OperationTypeAwareLimiter } from "./concurrency-manager";
 import { AdaptiveRateLimiter } from "./rate-limiting";
 import { streamPaginatedAPI } from "./streaming";
-import type { ExportItem } from "./streaming-export-manager";
+// Define ExportItem type locally since streaming-export-manager doesn't exist
+interface ExportItem {
+  id: string;
+  type: "page" | "database" | "block" | "user";
+  data: any;
+  timestamp: Date;
+}
 
 interface NotionApiStreamerConfig {
   startCursor?: string;

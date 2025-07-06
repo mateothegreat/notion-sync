@@ -1,15 +1,11 @@
 /**
  * Circuit Breaker Implementation
- * 
+ *
  * Provides fault tolerance through circuit breaker pattern
  */
 
-import { Observable, Subject, timer, EMPTY } from 'rxjs';
-import { 
-  CircuitBreakerState, 
-  CircuitBreakerConfig, 
-  CircuitBreakerError 
-} from './types';
+import { Observable, Subject, timer, EMPTY } from "rxjs";
+import { CircuitBreakerState, CircuitBreakerConfig, CircuitBreakerError } from "./types";
 
 /**
  * Circuit breaker statistics
@@ -29,7 +25,7 @@ export interface CircuitBreakerStats {
  * Circuit breaker implementation
  */
 export class CircuitBreaker {
-  private state: CircuitBreakerState = 'closed';
+  private state: CircuitBreakerState = "closed";
   private failureCount = 0;
   private successCount = 0;
   private totalRequests = 0;
@@ -48,10 +44,7 @@ export class CircuitBreaker {
    */
   async execute<T>(operation: () => Promise<T>): Promise<T> {
     if (!this.canProceed()) {
-      throw new CircuitBreakerError(
-        `Circuit breaker ${this.name} is open`,
-        this.name
-      );
+      throw new CircuitBreakerError(`Circuit breaker ${this.name} is open`, this.name);
     }
 
     this.totalRequests++;
@@ -73,17 +66,17 @@ export class CircuitBreaker {
     const now = Date.now();
 
     switch (this.state) {
-      case 'closed':
+      case "closed":
         return true;
 
-      case 'open':
+      case "open":
         if (this.nextRetryTime && now >= this.nextRetryTime) {
-          this.setState('half-open');
+          this.setState("half-open");
           return true;
         }
         return false;
 
-      case 'half-open':
+      case "half-open":
         return true;
 
       default:
@@ -98,10 +91,10 @@ export class CircuitBreaker {
     this.successCount++;
     this.lastSuccessTime = Date.now();
 
-    if (this.state === 'half-open') {
-      this.setState('closed');
+    if (this.state === "half-open") {
+      this.setState("closed");
       this.resetCounts();
-    } else if (this.state === 'closed') {
+    } else if (this.state === "closed") {
       // Reset failure count on success in closed state
       this.failureCount = 0;
     }
@@ -119,11 +112,11 @@ export class CircuitBreaker {
     this.failureCount++;
     this.lastFailureTime = Date.now();
 
-    if (this.state === 'half-open') {
-      this.setState('open');
+    if (this.state === "half-open") {
+      this.setState("open");
       this.scheduleRetry();
-    } else if (this.state === 'closed' && this.shouldOpen()) {
-      this.setState('open');
+    } else if (this.state === "closed" && this.shouldOpen()) {
+      this.setState("open");
       this.scheduleRetry();
     }
   }
@@ -155,7 +148,7 @@ export class CircuitBreaker {
    * Manually reset the circuit breaker
    */
   reset(): void {
-    this.setState('closed');
+    this.setState("closed");
     this.resetCounts();
     this.nextRetryTime = undefined;
   }
@@ -164,7 +157,7 @@ export class CircuitBreaker {
    * Manually open the circuit breaker
    */
   open(): void {
-    this.setState('open');
+    this.setState("open");
     this.scheduleRetry();
   }
 
@@ -190,7 +183,7 @@ export class CircuitBreaker {
     const monitoringWindow = this.config.monitoringPeriod;
 
     // Only consider failures within the monitoring window
-    if (this.lastFailureTime && (now - this.lastFailureTime) > monitoringWindow) {
+    if (this.lastFailureTime && now - this.lastFailureTime > monitoringWindow) {
       return false;
     }
 
@@ -205,10 +198,9 @@ export class CircuitBreaker {
       return false;
     }
 
-    return this.config.expectedErrors.some(expectedError => 
-      error.message.includes(expectedError) || 
-      error.name === expectedError ||
-      (error as any).code === expectedError
+    return this.config.expectedErrors.some(
+      (expectedError) =>
+        error.message.includes(expectedError) || error.name === expectedError || (error as any).code === expectedError
     );
   }
 
@@ -306,10 +298,7 @@ export class CircuitBreakerRegistry {
 /**
  * Utility function to create a circuit breaker with default configuration
  */
-export function createCircuitBreaker(
-  name: string,
-  options: Partial<CircuitBreakerConfig> = {}
-): CircuitBreaker {
+export function createCircuitBreaker(name: string, options: Partial<CircuitBreakerConfig> = {}): CircuitBreaker {
   const defaultConfig: CircuitBreakerConfig = {
     failureThreshold: 5,
     resetTimeout: 60000, // 1 minute
@@ -324,15 +313,8 @@ export function createCircuitBreaker(
 /**
  * Decorator for automatic circuit breaker protection
  */
-export function withCircuitBreaker(
-  name: string,
-  config?: Partial<CircuitBreakerConfig>
-) {
-  return function (
-    target: any,
-    propertyKey: string,
-    descriptor: PropertyDescriptor
-  ) {
+export function withCircuitBreaker(name: string, config?: Partial<CircuitBreakerConfig>) {
+  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     const originalMethod = descriptor.value;
     const circuitBreaker = createCircuitBreaker(name, config);
 

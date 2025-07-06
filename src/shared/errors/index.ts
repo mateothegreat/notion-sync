@@ -1,13 +1,13 @@
 /**
  * Error Hierarchy
- * 
+ *
  * Centralized error definitions for the application
  */
 
 export abstract class DomainError extends Error {
   abstract readonly code: string;
   abstract readonly statusCode: number;
-  
+
   constructor(
     message: string,
     public readonly context?: Record<string, any>
@@ -31,36 +31,36 @@ export abstract class DomainError extends Error {
 
 // Validation Errors
 export class ValidationError extends DomainError {
-  readonly code = 'VALIDATION_ERROR';
+  readonly code = "VALIDATION_ERROR";
   readonly statusCode = 400;
 }
 
 export class ConfigurationError extends DomainError {
-  readonly code = 'CONFIGURATION_ERROR';
+  readonly code = "CONFIGURATION_ERROR";
   readonly statusCode = 400;
 }
 
 // Business Logic Errors
 export class ExportError extends DomainError {
-  readonly code = 'EXPORT_ERROR';
+  readonly code = "EXPORT_ERROR";
   readonly statusCode = 422;
 }
 
 export class ExportNotFoundError extends DomainError {
-  readonly code = 'EXPORT_NOT_FOUND';
+  readonly code = "EXPORT_NOT_FOUND";
   readonly statusCode = 404;
 }
 
 export class ExportAlreadyRunningError extends DomainError {
-  readonly code = 'EXPORT_ALREADY_RUNNING';
+  readonly code = "EXPORT_ALREADY_RUNNING";
   readonly statusCode = 409;
 }
 
 // Infrastructure Errors
 export class NotionApiError extends DomainError {
-  readonly code = 'NOTION_API_ERROR';
+  readonly code = "NOTION_API_ERROR";
   readonly statusCode = 502;
-  
+
   constructor(
     message: string,
     public readonly notionErrorCode?: string,
@@ -71,9 +71,9 @@ export class NotionApiError extends DomainError {
 }
 
 export class RateLimitError extends DomainError {
-  readonly code = 'RATE_LIMIT_ERROR';
+  readonly code = "RATE_LIMIT_ERROR";
   readonly statusCode = 429;
-  
+
   constructor(
     message: string,
     public readonly retryAfter?: number,
@@ -84,47 +84,47 @@ export class RateLimitError extends DomainError {
 }
 
 export class CircuitBreakerError extends DomainError {
-  readonly code = 'CIRCUIT_BREAKER_ERROR';
+  readonly code = "CIRCUIT_BREAKER_ERROR";
   readonly statusCode = 503;
 }
 
 export class FileSystemError extends DomainError {
-  readonly code = 'FILESYSTEM_ERROR';
+  readonly code = "FILESYSTEM_ERROR";
   readonly statusCode = 500;
 }
 
 export class NetworkError extends DomainError {
-  readonly code = 'NETWORK_ERROR';
+  readonly code = "NETWORK_ERROR";
   readonly statusCode = 502;
 }
 
 // System Errors
 export class InternalError extends DomainError {
-  readonly code = 'INTERNAL_ERROR';
+  readonly code = "INTERNAL_ERROR";
   readonly statusCode = 500;
 }
 
 export class TimeoutError extends DomainError {
-  readonly code = 'TIMEOUT_ERROR';
+  readonly code = "TIMEOUT_ERROR";
   readonly statusCode = 408;
 }
 
 export class ConcurrencyError extends DomainError {
-  readonly code = 'CONCURRENCY_ERROR';
+  readonly code = "CONCURRENCY_ERROR";
   readonly statusCode = 409;
 }
 
 // Error Factory
 export class ErrorFactory {
   static fromNotionError(error: any): NotionApiError {
-    const message = error.message || 'Unknown Notion API error';
-    const code = error.code || 'unknown';
+    const message = error.message || "Unknown Notion API error";
+    const code = error.code || "unknown";
     const context = {
       originalError: error,
       url: error.url,
       status: error.status
     };
-    
+
     return new NotionApiError(message, code, context);
   }
 
@@ -136,7 +136,7 @@ export class ErrorFactory {
       path: error.path,
       code: error.code
     };
-    
+
     return new FileSystemError(message, context);
   }
 
@@ -148,7 +148,7 @@ export class ErrorFactory {
       errno: error.errno,
       syscall: error.syscall
     };
-    
+
     return new NetworkError(message, context);
   }
 }
@@ -163,7 +163,7 @@ export class DefaultErrorHandler implements ErrorHandler {
     if (error instanceof DomainError) {
       console.error(`[${error.code}] ${error.message}`, error.context);
     } else {
-      console.error('Unexpected error:', error);
+      console.error("Unexpected error:", error);
     }
   }
 }
@@ -181,7 +181,7 @@ export class RateLimitRecoveryStrategy implements RecoveryStrategy {
 
   async recover(error: Error): Promise<void> {
     if (error instanceof RateLimitError && error.retryAfter) {
-      await new Promise(resolve => setTimeout(resolve, error.retryAfter * 1000));
+      await new Promise((resolve) => setTimeout(resolve, error.retryAfter * 1000));
     }
   }
 }
@@ -194,7 +194,7 @@ export class CircuitBreakerRecoveryStrategy implements RecoveryStrategy {
   async recover(error: Error): Promise<void> {
     // Circuit breaker recovery is handled by the circuit breaker itself
     // This strategy just logs the attempt
-    console.log('Circuit breaker recovery attempted');
+    console.log("Circuit breaker recovery attempted");
   }
 }
 
@@ -202,11 +202,11 @@ export class CompositeRecoveryStrategy implements RecoveryStrategy {
   constructor(private strategies: RecoveryStrategy[]) {}
 
   canRecover(error: Error): boolean {
-    return this.strategies.some(strategy => strategy.canRecover(error));
+    return this.strategies.some((strategy) => strategy.canRecover(error));
   }
 
   async recover(error: Error): Promise<void> {
-    const strategy = this.strategies.find(s => s.canRecover(error));
+    const strategy = this.strategies.find((s) => s.canRecover(error));
     if (strategy) {
       await strategy.recover(error);
     }

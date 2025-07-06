@@ -1,6 +1,18 @@
 import { promises as fs } from "fs";
 import { join } from "path";
-import type { ExportItem, StreamingExportConfig } from "./streaming-export-manager";
+
+// Define types locally since streaming-export-manager doesn't exist
+interface ExportItem {
+  id: string;
+  type: "page" | "database" | "block" | "user";
+  data: any;
+  timestamp: Date;
+}
+
+interface StreamingExportConfig {
+  outputPath: string;
+  format: Array<"json" | "markdown" | "csv">;
+}
 
 /**
  * Processes export items and writes them to disk with proper formatting.

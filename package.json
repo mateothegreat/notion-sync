@@ -17,20 +17,25 @@
     ".": "./src/index.ts"
   },
   "devDependencies": {
-    "@notionhq/client": "^4.0.0",
-    "@oclif/core": "^4.4.1",
-    "@oclif/test": "^4.1.13",
-    "@types/node": "^24.0.10",
-    "@vitest/coverage-v8": "^3.2.4",
-    "@vitest/ui": "^3.2.4",
-    "chalk": "^5.4.1",
-    "dotenv": "^17.0.1",
-    "ora": "^8.2.0",
-    "ts-node": "^10.9.2",
-    "tsx": "^4.20.3",
-    "typescript": "^5.8.3",
-    "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^3.2.4"
+    "@notionhq/client": "4.0.0",
+    "@oclif/core": "4.4.1",
+    "@oclif/plugin-commands": "4.1.28",
+    "@oclif/plugin-help": "6.2.30",
+    "@oclif/prettier-config": "0.2.1",
+    "@oclif/test": "4.1.13",
+    "@types/config": "^3.3.5",
+    "@types/fast-levenshtein": "0.0.4",
+    "@types/node": "24.0.10",
+    "@vitest/coverage-v8": "3.2.4",
+    "@vitest/ui": "3.2.4",
+    "chalk": "5.4.1",
+    "dotenv": "17.0.1",
+    "ora": "8.2.0",
+    "ts-node": "10.9.2",
+    "tsx": "4.20.3",
+    "typescript": "5.8.3",
+    "vite-tsconfig-paths": "5.1.4",
+    "vitest": "3.2.4"
   },
   "bin": {
     "notion-sync": "./bin/run.js"
@@ -39,17 +44,35 @@
     "bin": "notion-sync",
     "commands": "./dist/commands",
     "dirname": "notion-sync",
+    "helpClass": "./dist/lib/commands/help",
     "topicSeparator": " ",
     "theme": "./src/theme.json",
     "hooks": {
       "init": [
         "./dist/hooks/init"
+      ],
+      "preparse": [
+        "./dist/hooks/preparse"
       ]
-    }
+    },
+    "plugins": [
+      "@oclif/plugin-version",
+      "@oclif/plugin-help"
+    ],
+    "devPlugins": [
+      "@oclif/plugin-help",
+      "@oclif/plugin-commands"
+    ]
   },
   "dependencies": {
-    "c12": "^3.0.4",
-    "immer": "^10.1.1",
-    "rxjs": "^7.8.2"
+    "@inquirer/prompts": "7.6.0",
+    "@oclif/plugin-version": "2.2.31",
+    "ansis": "4.1.0",
+    "fast-levenshtein": "3.0.0",
+    "immer": "10.1.1",
+    "rxjs": "7.8.2",
+    "yaml": "^2.8.0",
+    "zod": "^3.25.74",
+    "zod-config": "^1.1.1"
   }
 }

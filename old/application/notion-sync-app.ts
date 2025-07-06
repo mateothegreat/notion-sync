@@ -1,16 +1,16 @@
 /**
  * Notion Sync Application
- * 
+ *
  * Main application orchestrator using the control plane
  */
 
-import { createControlPlane, ControlPlane } from '../lib/control-plane';
-import { ExportService } from '../core/services/export-service';
-import { ProgressService } from '../core/services/progress-service';
-import { ExportCommandHandlers } from './commands/export-commands';
-import { NotionClient } from '../infrastructure/notion/notion-client';
-import { ApplicationConfig } from '../shared/types';
-import { DefaultErrorHandler } from '../shared/errors';
+import { ExportService } from "../core/services/export-service";
+import { ProgressService } from "../core/services/progress-service";
+import { NotionClient } from "../infrastructure/notion/notion-client";
+import { ControlPlane, createControlPlane } from "../lib/control-plane";
+import { DefaultErrorHandler } from "../shared/errors";
+import { ApplicationConfig } from "../shared/types";
+import { ExportCommandHandlers } from "./commands/export-commands";
 
 export class NotionSyncApp {
   private controlPlane: ControlPlane;
@@ -38,7 +38,7 @@ export class NotionSyncApp {
       return;
     }
 
-    console.log('Initializing Notion Sync Application...');
+    console.log("Initializing Notion Sync Application...");
 
     // Initialize control plane
     await this.controlPlane.initialize();
@@ -59,7 +59,7 @@ export class NotionSyncApp {
     this.setupEventHandlers();
 
     this.isInitialized = true;
-    console.log('Application initialized successfully');
+    console.log("Application initialized successfully");
   }
 
   async start(): Promise<void> {
@@ -71,7 +71,7 @@ export class NotionSyncApp {
       return;
     }
 
-    console.log('Starting Notion Sync Application...');
+    console.log("Starting Notion Sync Application...");
 
     // Start control plane
     await this.controlPlane.start();
@@ -80,7 +80,7 @@ export class NotionSyncApp {
     await this.startComponents();
 
     this.isStarted = true;
-    console.log('Application started successfully');
+    console.log("Application started successfully");
   }
 
   async stop(): Promise<void> {
@@ -88,7 +88,7 @@ export class NotionSyncApp {
       return;
     }
 
-    console.log('Stopping Notion Sync Application...');
+    console.log("Stopping Notion Sync Application...");
 
     // Stop all components
     await this.stopComponents();
@@ -97,7 +97,7 @@ export class NotionSyncApp {
     await this.controlPlane.stop();
 
     this.isStarted = false;
-    console.log('Application stopped successfully');
+    console.log("Application stopped successfully");
   }
 
   async destroy(): Promise<void> {
@@ -105,12 +105,12 @@ export class NotionSyncApp {
       await this.stop();
     }
 
-    console.log('Destroying Notion Sync Application...');
+    console.log("Destroying Notion Sync Application...");
 
     // Destroy control plane
     await this.controlPlane.destroy();
 
-    console.log('Application destroyed successfully');
+    console.log("Application destroyed successfully");
   }
 
   // Public API methods
@@ -137,7 +137,7 @@ export class NotionSyncApp {
   // Health check
   async getHealthStatus(): Promise<any> {
     return {
-      status: this.isStarted ? 'healthy' : 'stopped',
+      status: this.isStarted ? "healthy" : "stopped",
       initialized: this.isInitialized,
       started: this.isStarted,
       controlPlane: this.controlPlane.getStatus(),
@@ -148,19 +148,19 @@ export class NotionSyncApp {
 
   private setupErrorHandling(): void {
     // Global error handler
-    this.controlPlane.registerHook('error', async (context) => {
+    this.controlPlane.registerHook("error", async (context) => {
       const errorHandler = new DefaultErrorHandler();
       await errorHandler.handle(context.error);
     });
 
     // Unhandled promise rejections
-    process.on('unhandledRejection', (reason, promise) => {
-      console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    process.on("unhandledRejection", (reason, promise) => {
+      console.error("Unhandled Rejection at:", promise, "reason:", reason);
     });
 
     // Uncaught exceptions
-    process.on('uncaughtException', (error) => {
-      console.error('Uncaught Exception:', error);
+    process.on("uncaughtException", (error: Error) => {
+      console.error("Uncaught Exception:", error.message);
       process.exit(1);
     });
   }
@@ -170,7 +170,7 @@ export class NotionSyncApp {
     this.controlPlane.use(async (message, next) => {
       const startTime = Date.now();
       console.log(`[${new Date().toISOString()}] Processing message: ${message.type}`);
-      
+
       try {
         await next();
         const duration = Date.now() - startTime;
@@ -185,14 +185,14 @@ export class NotionSyncApp {
     // Metrics middleware
     this.controlPlane.use(async (message, next) => {
       const startTime = Date.now();
-      
+
       try {
         await next();
         const duration = Date.now() - startTime;
-        
+
         // Publish performance metric
-        await this.controlPlane.publish('metrics', {
-          type: 'message_processed',
+        await this.controlPlane.publish("metrics", {
+          type: "message_processed",
           messageType: message.type,
           duration,
           success: true,
@@ -200,17 +200,17 @@ export class NotionSyncApp {
         });
       } catch (error) {
         const duration = Date.now() - startTime;
-        
+
         // Publish error metric
-        await this.controlPlane.publish('metrics', {
-          type: 'message_failed',
+        await this.controlPlane.publish("metrics", {
+          type: "message_failed",
           messageType: message.type,
           duration,
           success: false,
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
           timestamp: new Date()
         });
-        
+
         throw error;
       }
     });
@@ -219,7 +219,7 @@ export class NotionSyncApp {
   private async createServices(): Promise<void> {
     // Event publisher function
     const eventPublisher = async (event: any) => {
-      await this.controlPlane.publish('domain-events', event);
+      await this.controlPlane.publish("domain-events", event);
     };
 
     // Create progress service
@@ -232,159 +232,152 @@ export class NotionSyncApp {
     this.exportService = new ExportService(exportRepository, eventPublisher);
 
     // Create command handlers
-    this.commandHandlers = new ExportCommandHandlers(
-      this.exportService,
-      this.progressService
-    );
+    this.commandHandlers = new ExportCommandHandlers(this.exportService, this.progressService);
 
     // Create circuit breaker for Notion API
-    const notionCircuitBreaker = this.controlPlane.getCircuitBreaker('notion-api', {
+    const notionCircuitBreaker = this.controlPlane.getCircuitBreaker("notion-api", {
       failureThreshold: 5,
       resetTimeout: 30000,
       monitoringPeriod: 60000
     });
 
     // Create Notion client
-    this.notionClient = new NotionClient(
-      this.config.notion,
-      eventPublisher,
-      notionCircuitBreaker
-    );
+    this.notionClient = new NotionClient(this.config.notion, eventPublisher, notionCircuitBreaker);
   }
 
   private async registerComponents(): Promise<void> {
     // Register export service
     this.controlPlane.registerComponent({
-      name: 'ExportService',
+      name: "ExportService",
       singleton: true,
       factory: () => ({
-        id: 'export-service',
-        name: 'ExportService',
-        state: 'created',
+        id: "export-service",
+        name: "ExportService",
+        state: "created",
         service: this.exportService,
-        
+
         async initialize() {
-          this.state = 'initialized';
+          this.state = "initialized";
         },
-        
+
         async start() {
-          this.state = 'started';
+          this.state = "started";
         },
-        
+
         async stop() {
-          this.state = 'stopped';
+          this.state = "stopped";
         }
       })
     });
 
     // Register progress service
     this.controlPlane.registerComponent({
-      name: 'ProgressService',
+      name: "ProgressService",
       singleton: true,
       factory: () => ({
-        id: 'progress-service',
-        name: 'ProgressService',
-        state: 'created',
+        id: "progress-service",
+        name: "ProgressService",
+        state: "created",
         service: this.progressService,
-        
+
         async initialize() {
-          this.state = 'initialized';
+          this.state = "initialized";
         },
-        
+
         async start() {
-          this.state = 'started';
+          this.state = "started";
         },
-        
+
         async stop() {
-          this.state = 'stopped';
+          this.state = "stopped";
         }
       })
     });
 
     // Register Notion client
     this.controlPlane.registerComponent({
-      name: 'NotionClient',
+      name: "NotionClient",
       singleton: true,
       factory: () => ({
-        id: 'notion-client',
-        name: 'NotionClient',
-        state: 'created',
+        id: "notion-client",
+        name: "NotionClient",
+        state: "created",
         client: this.notionClient,
-        
+
         async initialize() {
-          this.state = 'initialized';
+          this.state = "initialized";
         },
-        
+
         async start() {
-          this.state = 'started';
+          this.state = "started";
         },
-        
+
         async stop() {
-          this.state = 'stopped';
+          this.state = "stopped";
         }
       })
     });
 
     // Create the components immediately after registration
-    this.exportServiceComponent = await this.controlPlane.createComponent('ExportService');
-    this.progressServiceComponent = await this.controlPlane.createComponent('ProgressService');
-    this.notionClientComponent = await this.controlPlane.createComponent('NotionClient');
+    this.exportServiceComponent = await this.controlPlane.createComponent("ExportService");
+    this.progressServiceComponent = await this.controlPlane.createComponent("ProgressService");
+    this.notionClientComponent = await this.controlPlane.createComponent("NotionClient");
   }
 
   private setupEventHandlers(): void {
     // Handle domain events
-    this.controlPlane.subscribe('domain-events', async (message) => {
-      console.log('Domain event received:', message.payload.type);
-      
+    this.controlPlane.subscribe("domain-events", async (message: any) => {
+      console.log("Domain event received:", (message.payload as any).type);
+
       // You can add specific event handlers here
-      switch (message.payload.type) {
-        case 'export.started':
-          console.log('Export started:', message.payload.aggregateId);
+      switch ((message.payload as any).type) {
+        case "export.started":
+          console.log("Export started:", (message.payload as any).aggregateId);
           break;
-        case 'export.completed':
-          console.log('Export completed:', message.payload.aggregateId);
+        case "export.completed":
+          console.log("Export completed:", (message.payload as any).aggregateId);
           break;
-        case 'export.failed':
-          console.log('Export failed:', message.payload.aggregateId);
+        case "export.failed":
+          console.log("Export failed:", (message.payload as any).aggregateId);
           break;
         // Add more event handlers as needed
       }
     });
 
     // Handle metrics
-    this.controlPlane.subscribe('metrics', async (message) => {
+    this.controlPlane.subscribe("metrics", async (message: any) => {
       // In a real application, you might send these to a monitoring system
-      console.log('Metric:', message.payload);
+      console.log("Metric:", message.payload);
     });
 
     // Handle command processing
-    this.controlPlane.subscribe('commands', async (message) => {
-      const command = message.payload;
+    this.controlPlane.subscribe("commands", async (message: any) => {
+      const command = message.payload as any;
       let result;
 
       switch (command.type) {
-        case 'export.create':
-          result = await this.commandHandlers.handleCreateExport(command);
+        case "export.create":
+          result = await this.commandHandlers.handleCreateExport(command as any);
           break;
-        case 'export.start':
-          result = await this.commandHandlers.handleStartExport(command);
+        case "export.start":
+          result = await this.commandHandlers.handleStartExport(command as any);
           break;
-        case 'export.cancel':
-          result = await this.commandHandlers.handleCancelExport(command);
+        case "export.cancel":
+          result = await this.commandHandlers.handleCancelExport(command as any);
           break;
-        case 'export.delete':
-          result = await this.commandHandlers.handleDeleteExport(command);
+        case "export.delete":
+          result = await this.commandHandlers.handleDeleteExport(command as any);
           break;
-        case 'export.restart':
-          result = await this.commandHandlers.handleRestartExport(command);
+        case "export.restart":
+          result = await this.commandHandlers.handleRestartExport(command as any);
           break;
         default:
-          console.warn('Unknown command type:', command.type);
+          console.warn("Unknown command type:", command.type);
           return;
       }
 
       // Publish command result
-      await this.controlPlane.publish('command-results', {
+      await this.controlPlane.publish("command-results", {
         commandId: command.id,
         result
       });
@@ -393,11 +386,11 @@ export class NotionSyncApp {
 
   private async startComponents(): Promise<void> {
     const components = [
-      { name: 'ExportService', component: this.exportServiceComponent },
-      { name: 'ProgressService', component: this.progressServiceComponent },
-      { name: 'NotionClient', component: this.notionClientComponent }
+      { name: "ExportService", component: this.exportServiceComponent },
+      { name: "ProgressService", component: this.progressServiceComponent },
+      { name: "NotionClient", component: this.notionClientComponent }
     ];
-    
+
     for (const { name, component } of components) {
       try {
         if (component) {
@@ -413,11 +406,11 @@ export class NotionSyncApp {
 
   private async stopComponents(): Promise<void> {
     const components = [
-      { name: 'NotionClient', component: this.notionClientComponent },
-      { name: 'ProgressService', component: this.progressServiceComponent },
-      { name: 'ExportService', component: this.exportServiceComponent }
+      { name: "NotionClient", component: this.notionClientComponent },
+      { name: "ProgressService", component: this.progressServiceComponent },
+      { name: "ExportService", component: this.exportServiceComponent }
     ];
-    
+
     for (const { name, component } of components) {
       try {
         if (component) {
@@ -433,9 +426,9 @@ export class NotionSyncApp {
   private async getComponentsStatus(): Promise<any> {
     // Return status of all components
     return {
-      exportService: this.exportService ? 'running' : 'stopped',
-      progressService: this.progressService ? 'running' : 'stopped',
-      notionClient: this.notionClient ? 'running' : 'stopped'
+      exportService: this.exportService ? "running" : "stopped",
+      progressService: this.progressService ? "running" : "stopped",
+      notionClient: this.notionClient ? "running" : "stopped"
     };
   }
 }
@@ -453,11 +446,11 @@ class InMemoryExportRepository {
   }
 
   async findByStatus(status: any): Promise<any[]> {
-    return Array.from(this.exports.values()).filter(exp => exp.status === status);
+    return Array.from(this.exports.values()).filter((exp) => exp.status === status);
   }
 
   async findRunning(): Promise<any[]> {
-    return Array.from(this.exports.values()).filter(exp => exp.status === 'running');
+    return Array.from(this.exports.values()).filter((exp) => exp.status === "running");
   }
 
   async delete(id: string): Promise<void> {

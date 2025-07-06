@@ -1,12 +1,12 @@
 /**
  * Middleware System
- * 
+ *
  * Provides extensible middleware pipeline for message processing
  */
 
-import { Observable, from, of } from 'rxjs';
-import { mergeMap, catchError } from 'rxjs/operators';
-import { Message, Middleware } from './types';
+import { Observable, from, of } from "rxjs";
+import { mergeMap, catchError } from "rxjs/operators";
+import { Message, Middleware } from "./types";
 
 /**
  * Middleware context for passing data between middleware
@@ -85,16 +85,19 @@ export class MiddlewarePipeline {
  */
 export const loggingMiddleware: EnhancedMiddleware = async (message, context, next) => {
   const startTime = Date.now();
-  
+
   console.log(`[${new Date().toISOString()}] Processing message: ${message.type} (${message.id})`);
-  
+
   try {
     await next();
     const duration = Date.now() - startTime;
     console.log(`[${new Date().toISOString()}] Completed message: ${message.type} (${message.id}) in ${duration}ms`);
   } catch (error) {
     const duration = Date.now() - startTime;
-    console.error(`[${new Date().toISOString()}] Failed message: ${message.type} (${message.id}) after ${duration}ms`, error);
+    console.error(
+      `[${new Date().toISOString()}] Failed message: ${message.type} (${message.id}) after ${duration}ms`,
+      error
+    );
     throw error;
   }
 };
@@ -104,15 +107,15 @@ export const loggingMiddleware: EnhancedMiddleware = async (message, context, ne
  */
 export function validationMiddleware<T>(
   validator: (payload: T) => boolean | Promise<boolean>,
-  errorMessage = 'Message validation failed'
+  errorMessage = "Message validation failed"
 ): EnhancedMiddleware<T> {
   return async (message, context, next) => {
     const isValid = await validator(message.payload);
-    
+
     if (!isValid) {
       throw new Error(`${errorMessage}: ${message.type} (${message.id})`);
     }
-    
+
     await next();
   };
 }
@@ -120,36 +123,33 @@ export function validationMiddleware<T>(
 /**
  * Built-in middleware for rate limiting
  */
-export function rateLimitingMiddleware(
-  maxRequests: number,
-  windowMs: number
-): EnhancedMiddleware {
+export function rateLimitingMiddleware(maxRequests: number, windowMs: number): EnhancedMiddleware {
   const requests = new Map<string, number[]>();
 
   return async (message, context, next) => {
     const now = Date.now();
-    const key = message.source || 'default';
-    
+    const key = message.source || "default";
+
     if (!requests.has(key)) {
       requests.set(key, []);
     }
-    
+
     const timestamps = requests.get(key)!;
-    
+
     // Remove old timestamps outside the window
     const cutoff = now - windowMs;
     while (timestamps.length > 0 && timestamps[0] < cutoff) {
       timestamps.shift();
     }
-    
+
     // Check if rate limit exceeded
     if (timestamps.length >= maxRequests) {
       throw new Error(`Rate limit exceeded for ${key}: ${maxRequests} requests per ${windowMs}ms`);
     }
-    
+
     // Add current timestamp
     timestamps.push(now);
-    
+
     await next();
   };
 }
@@ -199,7 +199,7 @@ export function metricsMiddleware(
       throw err;
     } finally {
       const duration = Date.now() - startTime;
-      
+
       if (metricsCollector) {
         metricsCollector({
           messageType: message.type,
@@ -216,18 +216,16 @@ export function metricsMiddleware(
 /**
  * Built-in middleware for message transformation
  */
-export function transformationMiddleware<T, R>(
-  transformer: (payload: T) => R | Promise<R>
-): EnhancedMiddleware<T> {
+export function transformationMiddleware<T, R>(transformer: (payload: T) => R | Promise<R>): EnhancedMiddleware<T> {
   return async (message, context, next) => {
     const transformedPayload = await transformer(message.payload);
-    
+
     // Store original payload in context
     context.originalPayload = message.payload;
-    
+
     // Replace payload with transformed version
     (message as any).payload = transformedPayload;
-    
+
     await next();
   };
 }
@@ -245,11 +243,11 @@ export function cachingMiddleware<T>(
   return async (message, context, next) => {
     const key = cacheKey(message);
     const now = Date.now();
-    
+
     // Check if cached result exists and is not expired
     if (cache.has(key)) {
       const timestamp = timestamps.get(key);
-      if (timestamp && (now - timestamp) < ttlMs) {
+      if (timestamp && now - timestamp < ttlMs) {
         context.cachedResult = cache.get(key);
         return; // Skip processing, use cached result
       } else {
@@ -258,9 +256,9 @@ export function cachingMiddleware<T>(
         timestamps.delete(key);
       }
     }
-    
+
     await next();
-    
+
     // Cache the result if available in context
     if (context.result !== undefined) {
       cache.set(key, context.result);
@@ -277,11 +275,11 @@ export function authenticationMiddleware(
 ): EnhancedMiddleware {
   return async (message, context, next) => {
     const isAuthenticated = await authenticator(message);
-    
+
     if (!isAuthenticated) {
       throw new Error(`Authentication failed for message ${message.type} (${message.id})`);
     }
-    
+
     await next();
   };
 }
@@ -294,12 +292,12 @@ export function filteringMiddleware<T>(
 ): EnhancedMiddleware<T> {
   return async (message, context, next) => {
     const shouldProcess = await filter(message);
-    
+
     if (!shouldProcess) {
       context.filtered = true;
       return; // Skip processing
     }
-    
+
     await next();
   };
 }
@@ -324,17 +322,17 @@ export class MiddlewareComposer {
   compose(): EnhancedMiddleware {
     return async (message, context, next) => {
       const pipeline = new MiddlewarePipeline();
-      
+
       // Add all middleware to the pipeline
       for (const middleware of this.middleware) {
         pipeline.use(middleware);
       }
-      
+
       // Add the final next function
       pipeline.use(async (msg, ctx, nextFn) => {
         await next();
       });
-      
+
       await pipeline.execute(message, context);
     };
   }

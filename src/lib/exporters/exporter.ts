@@ -1,4 +1,4 @@
-import { Format } from "$lib/renderers/format";
+import { Format } from "../renderers/format";
 
 export type ExporterConfig = {
   format: Format;

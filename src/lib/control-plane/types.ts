@@ -2,7 +2,7 @@
  * Core types for the Control Plane
  */
 
-import { Observable, Subject } from 'rxjs';
+import { Observable, Subject } from "rxjs";
 
 /**
  * Message types for the control plane
@@ -77,10 +77,7 @@ export type EventHandler<T = any> = (event: Event<T>) => void | Promise<void>;
 /**
  * Middleware function type
  */
-export type Middleware<T = any> = (
-  message: Message<T>,
-  next: () => void | Promise<void>
-) => void | Promise<void>;
+export type Middleware<T = any> = (message: Message<T>, next: () => void | Promise<void>) => void | Promise<void>;
 
 /**
  * Plugin interface
@@ -95,14 +92,14 @@ export interface Plugin {
 /**
  * Hook types
  */
-export type HookType = 
-  | 'before-message'
-  | 'after-message'
-  | 'before-command'
-  | 'after-command'
-  | 'before-event'
-  | 'after-event'
-  | 'error';
+export type HookType =
+  | "before-message"
+  | "after-message"
+  | "before-command"
+  | "after-command"
+  | "before-event"
+  | "after-event"
+  | "error";
 
 /**
  * Hook function type
@@ -122,7 +119,7 @@ export interface StateChange<T = any> {
 /**
  * Component lifecycle states
  */
-export type ComponentState = 'created' | 'initialized' | 'started' | 'stopped' | 'destroyed';
+export type ComponentState = "created" | "initialized" | "started" | "stopped" | "destroyed";
 
 /**
  * Component interface
@@ -151,7 +148,7 @@ export interface ComponentConfig {
 /**
  * Circuit breaker states
  */
-export type CircuitBreakerState = 'closed' | 'open' | 'half-open';
+export type CircuitBreakerState = "closed" | "open" | "half-open";
 
 /**
  * Circuit breaker configuration
@@ -194,29 +191,45 @@ export interface Serializer {
  * Error types
  */
 export class ControlPlaneError extends Error {
-  constructor(message: string, public code?: string, public cause?: Error) {
+  constructor(
+    message: string,
+    public code?: string,
+    public cause?: Error
+  ) {
     super(message);
-    this.name = 'ControlPlaneError';
+    this.name = "ControlPlaneError";
   }
 }
 
 export class MessageRoutingError extends ControlPlaneError {
-  constructor(message: string, public messageId?: string, cause?: Error) {
-    super(message, 'MESSAGE_ROUTING_ERROR', cause);
-    this.name = 'MessageRoutingError';
+  constructor(
+    message: string,
+    public messageId?: string,
+    cause?: Error
+  ) {
+    super(message, "MESSAGE_ROUTING_ERROR", cause);
+    this.name = "MessageRoutingError";
   }
 }
 
 export class ComponentError extends ControlPlaneError {
-  constructor(message: string, public componentId?: string, cause?: Error) {
-    super(message, 'COMPONENT_ERROR', cause);
-    this.name = 'ComponentError';
+  constructor(
+    message: string,
+    public componentId?: string,
+    cause?: Error
+  ) {
+    super(message, "COMPONENT_ERROR", cause);
+    this.name = "ComponentError";
   }
 }
 
 export class CircuitBreakerError extends ControlPlaneError {
-  constructor(message: string, public operation?: string, cause?: Error) {
-    super(message, 'CIRCUIT_BREAKER_ERROR', cause);
-    this.name = 'CircuitBreakerError';
+  constructor(
+    message: string,
+    public operation?: string,
+    cause?: Error
+  ) {
+    super(message, "CIRCUIT_BREAKER_ERROR", cause);
+    this.name = "CircuitBreakerError";
   }
 }

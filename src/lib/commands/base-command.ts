@@ -1,19 +1,43 @@
-import { Command } from "@oclif/core";
+import { parseables } from "$lib/config-loader";
+import { Command, Interfaces } from "@oclif/core";
+import { Flag } from "@oclif/core/interfaces";
 
-export abstract class BaseCommand extends Command {
-  // static override flags = {
-  //   token: Flags.string({
-  //     description: "Notion API integration token.",
-  //     default: async () => {
-  //       const token = process.env.NOTION_TOKEN;
-  //       console.log("token", token);
-  //       if (!token) {
-  //         throw new Error("NOTION_TOKEN is not set");
-  //       }
-  //       return token;
-  //     },
-  //     env: "NOTION_TOKEN",
-  //     required: true,
-  //   }),
-  // };
+export type Flags<T extends typeof Command> = Interfaces.InferredFlags<(typeof BaseCommand)["baseFlags"] & T["flags"]>;
+export type Args<T extends typeof Command> = Interfaces.InferredArgs<T["args"]>;
+
+export abstract class BaseCommand<T extends typeof Command> extends Command {
+  static enableJsonFlag = true;
+
+  static baseFlags: Record<string, Flag<any>> = Object.fromEntries(
+    Object.entries(parseables).map(([key, value]) => [key, value.flag as Flag<unknown>])
+  );
+
+  protected flags!: Flags<T>;
+  protected args!: Args<T>;
+
+  public async init(): Promise<void> {
+    await super.init();
+
+    const { args, flags } = await this.parse({
+      flags: this.ctor.flags,
+      baseFlags: (super.ctor as typeof BaseCommand).baseFlags,
+      enableJsonFlag: this.ctor.enableJsonFlag,
+      args: this.ctor.args,
+      strict: this.ctor.strict
+    });
+
+    this.flags = flags as Flags<T>;
+    this.args = args as Args<T>;
+  }
+
+  protected async catch(err: Error & { exitCode?: number }): Promise<any> {
+    // add any custom logic to handle errors from the command
+    // or simply return the parent class error handling
+    return super.catch(err);
+  }
+
+  protected async finally(_: Error | undefined): Promise<any> {
+    // called after run and catch regardless of whether or not the command errored
+    return super.finally(_);
+  }
 }

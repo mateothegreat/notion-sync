@@ -1,0 +1,54 @@
+{
+  "name": "@mateothegreat/eda-sdk",
+  "version": "1.0.0",
+  "description": "Event-Driven Architecture SDK with broker bus, circuit breaker, and rate limiting",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./control-plane": {
+      "import": "./dist/control-plane/index.js",
+      "types": "./dist/control-plane/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "rxjs": "^7.8.2",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/uuid": "^9.0.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  },
+  "peerDependencies": {
+    "rxjs": "^7.0.0"
+  },
+  "keywords": [
+    "event-driven",
+    "architecture",
+    "broker",
+    "circuit-breaker",
+    "rate-limiting",
+    "rxjs",
+    "typescript"
+  ],
+  "author": "Matthew Davis",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mateothegreat/notion-sync.git",
+    "directory": "packages/eda-sdk"
+  }
+}

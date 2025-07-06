@@ -1,17 +1,17 @@
 /**
  * Export Command Handlers
- * 
+ *
  * Application layer command handlers for export operations
  */
 
-import { Command, CommandResult, ExportConfiguration } from '../../shared/types';
-import { ExportService } from '../../core/services/export-service';
-import { ProgressService } from '../../core/services/progress-service';
-import { ValidationError } from '../../shared/errors';
+import { ExportService } from "../../core/services/export-service";
+import { ProgressService } from "../../core/services/progress-service";
+import { ValidationError } from "../../shared/errors";
+import { Command, CommandResult, ExportConfiguration } from "../../shared/types";
 
 // Command Types
 export interface CreateExportCommand extends Command {
-  type: 'export.create';
+  type: "export.create";
   payload: {
     configuration: ExportConfiguration;
     userId?: string;
@@ -19,14 +19,14 @@ export interface CreateExportCommand extends Command {
 }
 
 export interface StartExportCommand extends Command {
-  type: 'export.start';
+  type: "export.start";
   payload: {
     exportId: string;
   };
 }
 
 export interface CancelExportCommand extends Command {
-  type: 'export.cancel';
+  type: "export.cancel";
   payload: {
     exportId: string;
     reason: string;
@@ -34,14 +34,14 @@ export interface CancelExportCommand extends Command {
 }
 
 export interface DeleteExportCommand extends Command {
-  type: 'export.delete';
+  type: "export.delete";
   payload: {
     exportId: string;
   };
 }
 
 export interface RestartExportCommand extends Command {
-  type: 'export.restart';
+  type: "export.restart";
   payload: {
     exportId: string;
   };
@@ -57,9 +57,9 @@ export class ExportCommandHandlers {
   async handleCreateExport(command: CreateExportCommand): Promise<CommandResult> {
     try {
       this.validateCreateExportCommand(command);
-      
+
       const export_ = await this.exportService.createExport(command.payload.configuration);
-      
+
       return {
         success: true,
         data: {
@@ -79,15 +79,15 @@ export class ExportCommandHandlers {
   async handleStartExport(command: StartExportCommand): Promise<CommandResult> {
     try {
       this.validateStartExportCommand(command);
-      
+
       await this.exportService.startExport(command.payload.exportId);
       await this.progressService.startTracking(command.payload.exportId);
-      
+
       return {
         success: true,
         data: {
           exportId: command.payload.exportId,
-          status: 'running'
+          status: "running"
         }
       };
     } catch (error) {
@@ -101,15 +101,15 @@ export class ExportCommandHandlers {
   async handleCancelExport(command: CancelExportCommand): Promise<CommandResult> {
     try {
       this.validateCancelExportCommand(command);
-      
+
       await this.exportService.cancelExport(command.payload.exportId, command.payload.reason);
       this.progressService.stopTracking(command.payload.exportId);
-      
+
       return {
         success: true,
         data: {
           exportId: command.payload.exportId,
-          status: 'cancelled',
+          status: "cancelled",
           reason: command.payload.reason
         }
       };
@@ -124,9 +124,9 @@ export class ExportCommandHandlers {
   async handleDeleteExport(command: DeleteExportCommand): Promise<CommandResult> {
     try {
       this.validateDeleteExportCommand(command);
-      
+
       await this.exportService.deleteExport(command.payload.exportId);
-      
+
       return {
         success: true,
         data: {
@@ -145,9 +145,9 @@ export class ExportCommandHandlers {
   async handleRestartExport(command: RestartExportCommand): Promise<CommandResult> {
     try {
       this.validateRestartExportCommand(command);
-      
+
       const newExport = await this.exportService.restartExport(command.payload.exportId);
-      
+
       return {
         success: true,
         data: {
@@ -167,21 +167,21 @@ export class ExportCommandHandlers {
   // Validation methods
   private validateCreateExportCommand(command: CreateExportCommand): void {
     if (!command.payload.configuration) {
-      throw new ValidationError('Configuration is required');
+      throw new ValidationError("Configuration is required");
     }
 
     const config = command.payload.configuration;
-    
+
     if (!config.outputPath) {
-      throw new ValidationError('Output path is required');
+      throw new ValidationError("Output path is required");
     }
 
     if (!config.format) {
-      throw new ValidationError('Export format is required');
+      throw new ValidationError("Export format is required");
     }
 
     if (config.databases.length === 0 && config.pages.length === 0) {
-      throw new ValidationError('At least one database or page must be specified');
+      throw new ValidationError("At least one database or page must be specified");
     }
 
     // Validate database IDs format
@@ -201,45 +201,45 @@ export class ExportCommandHandlers {
 
   private validateStartExportCommand(command: StartExportCommand): void {
     if (!command.payload.exportId) {
-      throw new ValidationError('Export ID is required');
+      throw new ValidationError("Export ID is required");
     }
 
     if (!this.isValidUuid(command.payload.exportId)) {
-      throw new ValidationError('Invalid export ID format');
+      throw new ValidationError("Invalid export ID format");
     }
   }
 
   private validateCancelExportCommand(command: CancelExportCommand): void {
     if (!command.payload.exportId) {
-      throw new ValidationError('Export ID is required');
+      throw new ValidationError("Export ID is required");
     }
 
     if (!command.payload.reason) {
-      throw new ValidationError('Cancellation reason is required');
+      throw new ValidationError("Cancellation reason is required");
     }
 
     if (!this.isValidUuid(command.payload.exportId)) {
-      throw new ValidationError('Invalid export ID format');
+      throw new ValidationError("Invalid export ID format");
     }
   }
 
   private validateDeleteExportCommand(command: DeleteExportCommand): void {
     if (!command.payload.exportId) {
-      throw new ValidationError('Export ID is required');
+      throw new ValidationError("Export ID is required");
     }
 
     if (!this.isValidUuid(command.payload.exportId)) {
-      throw new ValidationError('Invalid export ID format');
+      throw new ValidationError("Invalid export ID format");
     }
   }
 
   private validateRestartExportCommand(command: RestartExportCommand): void {
     if (!command.payload.exportId) {
-      throw new ValidationError('Export ID is required');
+      throw new ValidationError("Export ID is required");
     }
 
     if (!this.isValidUuid(command.payload.exportId)) {
-      throw new ValidationError('Invalid export ID format');
+      throw new ValidationError("Invalid export ID format");
     }
   }
 
@@ -255,12 +255,27 @@ export class ExportCommandHandlers {
   }
 }
 
-// Command Factory
+/**
+ * Export Command Factory
+ *
+ * Factory class responsible for creating standardized export command objects
+ * that conform to the Command interface. This factory ensures consistent
+ * command structure with proper IDs, timestamps, and metadata across all
+ * export operations in the application.
+ *
+ * The factory generates commands for the complete export lifecycle including
+ * creation, execution, cancellation, deletion, and restart operations. Each
+ * command is created with a unique UUID identifier and timestamp metadata
+ * to support traceability and audit requirements.
+ *
+ * All generated commands follow the CQRS pattern and are designed to be
+ * processed by the ExportCommandHandler for coordinated export management.
+ */
 export class ExportCommandFactory {
   static createExport(configuration: ExportConfiguration, userId?: string): CreateExportCommand {
     return {
       id: crypto.randomUUID(),
-      type: 'export.create',
+      type: "export.create",
       payload: { configuration, userId },
       metadata: { timestamp: new Date() }
     };
@@ -269,7 +284,7 @@ export class ExportCommandFactory {
   static startExport(exportId: string): StartExportCommand {
     return {
       id: crypto.randomUUID(),
-      type: 'export.start',
+      type: "export.start",
       payload: { exportId },
       metadata: { timestamp: new Date() }
     };
@@ -278,7 +293,7 @@ export class ExportCommandFactory {
   static cancelExport(exportId: string, reason: string): CancelExportCommand {
     return {
       id: crypto.randomUUID(),
-      type: 'export.cancel',
+      type: "export.cancel",
       payload: { exportId, reason },
       metadata: { timestamp: new Date() }
     };
@@ -287,7 +302,7 @@ export class ExportCommandFactory {
   static deleteExport(exportId: string): DeleteExportCommand {
     return {
       id: crypto.randomUUID(),
-      type: 'export.delete',
+      type: "export.delete",
       payload: { exportId },
       metadata: { timestamp: new Date() }
     };
@@ -296,7 +311,7 @@ export class ExportCommandFactory {
   static restartExport(exportId: string): RestartExportCommand {
     return {
       id: crypto.randomUUID(),
-      type: 'export.restart',
+      type: "export.restart",
       payload: { exportId },
       metadata: { timestamp: new Date() }
     };

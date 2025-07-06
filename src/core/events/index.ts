@@ -1,10 +1,10 @@
 /**
  * Domain Events
- * 
+ *
  * Events that represent business-significant occurrences
  */
 
-import { DomainEvent, ExportStatus, ProgressInfo, ErrorInfo } from '../../shared/types';
+import { DomainEvent, ExportStatus, ProgressInfo, ErrorInfo } from "../../shared/types";
 
 // Base event factory
 export function createDomainEvent(
@@ -28,7 +28,7 @@ export function createDomainEvent(
 
 // Export Events
 export interface ExportStartedEvent extends DomainEvent {
-  type: 'export.started';
+  type: "export.started";
   payload: {
     exportId: string;
     configuration: any;
@@ -37,7 +37,7 @@ export interface ExportStartedEvent extends DomainEvent {
 }
 
 export interface ExportProgressUpdatedEvent extends DomainEvent {
-  type: 'export.progress.updated';
+  type: "export.progress.updated";
   payload: {
     exportId: string;
     progress: ProgressInfo;
@@ -45,7 +45,7 @@ export interface ExportProgressUpdatedEvent extends DomainEvent {
 }
 
 export interface ExportCompletedEvent extends DomainEvent {
-  type: 'export.completed';
+  type: "export.completed";
   payload: {
     exportId: string;
     outputPath: string;
@@ -56,7 +56,7 @@ export interface ExportCompletedEvent extends DomainEvent {
 }
 
 export interface ExportFailedEvent extends DomainEvent {
-  type: 'export.failed';
+  type: "export.failed";
   payload: {
     exportId: string;
     error: ErrorInfo;
@@ -65,7 +65,7 @@ export interface ExportFailedEvent extends DomainEvent {
 }
 
 export interface ExportCancelledEvent extends DomainEvent {
-  type: 'export.cancelled';
+  type: "export.cancelled";
   payload: {
     exportId: string;
     reason: string;
@@ -75,7 +75,7 @@ export interface ExportCancelledEvent extends DomainEvent {
 
 // Notion API Events
 export interface NotionObjectFetchedEvent extends DomainEvent {
-  type: 'notion.object.fetched';
+  type: "notion.object.fetched";
   payload: {
     objectId: string;
     objectType: string;
@@ -85,7 +85,7 @@ export interface NotionObjectFetchedEvent extends DomainEvent {
 }
 
 export interface NotionRateLimitHitEvent extends DomainEvent {
-  type: 'notion.rate_limit.hit';
+  type: "notion.rate_limit.hit";
   payload: {
     remaining: number;
     resetTime: Date;
@@ -94,7 +94,7 @@ export interface NotionRateLimitHitEvent extends DomainEvent {
 }
 
 export interface NotionApiErrorEvent extends DomainEvent {
-  type: 'notion.api.error';
+  type: "notion.api.error";
   payload: {
     error: ErrorInfo;
     endpoint: string;
@@ -104,7 +104,7 @@ export interface NotionApiErrorEvent extends DomainEvent {
 
 // Circuit Breaker Events
 export interface CircuitBreakerOpenedEvent extends DomainEvent {
-  type: 'circuit_breaker.opened';
+  type: "circuit_breaker.opened";
   payload: {
     name: string;
     failureCount: number;
@@ -113,7 +113,7 @@ export interface CircuitBreakerOpenedEvent extends DomainEvent {
 }
 
 export interface CircuitBreakerClosedEvent extends DomainEvent {
-  type: 'circuit_breaker.closed';
+  type: "circuit_breaker.closed";
   payload: {
     name: string;
     successCount: number;
@@ -121,7 +121,7 @@ export interface CircuitBreakerClosedEvent extends DomainEvent {
 }
 
 export interface CircuitBreakerHalfOpenEvent extends DomainEvent {
-  type: 'circuit_breaker.half_open';
+  type: "circuit_breaker.half_open";
   payload: {
     name: string;
     nextAttemptTime: Date;
@@ -130,7 +130,7 @@ export interface CircuitBreakerHalfOpenEvent extends DomainEvent {
 
 // Progress Events
 export interface ProgressSectionStartedEvent extends DomainEvent {
-  type: 'progress.section.started';
+  type: "progress.section.started";
   payload: {
     exportId: string;
     section: string;
@@ -139,7 +139,7 @@ export interface ProgressSectionStartedEvent extends DomainEvent {
 }
 
 export interface ProgressSectionCompletedEvent extends DomainEvent {
-  type: 'progress.section.completed';
+  type: "progress.section.completed";
   payload: {
     exportId: string;
     section: string;
@@ -150,7 +150,7 @@ export interface ProgressSectionCompletedEvent extends DomainEvent {
 }
 
 export interface ProgressItemProcessedEvent extends DomainEvent {
-  type: 'progress.item.processed';
+  type: "progress.item.processed";
   payload: {
     exportId: string;
     itemId: string;
@@ -163,7 +163,7 @@ export interface ProgressItemProcessedEvent extends DomainEvent {
 
 // File System Events
 export interface FileCreatedEvent extends DomainEvent {
-  type: 'file.created';
+  type: "file.created";
   payload: {
     path: string;
     size: number;
@@ -172,7 +172,7 @@ export interface FileCreatedEvent extends DomainEvent {
 }
 
 export interface FileUpdatedEvent extends DomainEvent {
-  type: 'file.updated';
+  type: "file.updated";
   payload: {
     path: string;
     oldSize: number;
@@ -181,7 +181,7 @@ export interface FileUpdatedEvent extends DomainEvent {
 }
 
 export interface DirectoryCreatedEvent extends DomainEvent {
-  type: 'directory.created';
+  type: "directory.created";
   payload: {
     path: string;
   };
@@ -189,7 +189,7 @@ export interface DirectoryCreatedEvent extends DomainEvent {
 
 // Performance Events
 export interface PerformanceMetricEvent extends DomainEvent {
-  type: 'performance.metric';
+  type: "performance.metric";
   payload: {
     metric: string;
     value: number;
@@ -199,7 +199,7 @@ export interface PerformanceMetricEvent extends DomainEvent {
 }
 
 export interface ConcurrencyAdjustedEvent extends DomainEvent {
-  type: 'concurrency.adjusted';
+  type: "concurrency.adjusted";
   payload: {
     operation: string;
     oldLimit: number;
@@ -211,69 +211,152 @@ export interface ConcurrencyAdjustedEvent extends DomainEvent {
 // Event Factories
 export const ExportEvents = {
   started: (exportId: string, configuration: any, userId?: string): ExportStartedEvent =>
-    createDomainEvent('export.started', exportId, 'Export', { exportId, configuration, userId }) as ExportStartedEvent,
+    createDomainEvent("export.started", exportId, "Export", { exportId, configuration, userId }) as ExportStartedEvent,
 
   progressUpdated: (exportId: string, progress: ProgressInfo): ExportProgressUpdatedEvent =>
-    createDomainEvent('export.progress.updated', exportId, 'Export', { exportId, progress }) as ExportProgressUpdatedEvent,
+    createDomainEvent("export.progress.updated", exportId, "Export", {
+      exportId,
+      progress
+    }) as ExportProgressUpdatedEvent,
 
-  completed: (exportId: string, outputPath: string, duration: number, itemsProcessed: number, errors: ErrorInfo[]): ExportCompletedEvent =>
-    createDomainEvent('export.completed', exportId, 'Export', { exportId, outputPath, duration, itemsProcessed, errors }) as ExportCompletedEvent,
+  completed: (
+    exportId: string,
+    outputPath: string,
+    duration: number,
+    itemsProcessed: number,
+    errors: ErrorInfo[]
+  ): ExportCompletedEvent =>
+    createDomainEvent("export.completed", exportId, "Export", {
+      exportId,
+      outputPath,
+      duration,
+      itemsProcessed,
+      errors
+    }) as ExportCompletedEvent,
 
   failed: (exportId: string, error: ErrorInfo, progress: ProgressInfo): ExportFailedEvent =>
-    createDomainEvent('export.failed', exportId, 'Export', { exportId, error, progress }) as ExportFailedEvent,
+    createDomainEvent("export.failed", exportId, "Export", { exportId, error, progress }) as ExportFailedEvent,
 
   cancelled: (exportId: string, reason: string, progress: ProgressInfo): ExportCancelledEvent =>
-    createDomainEvent('export.cancelled', exportId, 'Export', { exportId, reason, progress }) as ExportCancelledEvent
+    createDomainEvent("export.cancelled", exportId, "Export", { exportId, reason, progress }) as ExportCancelledEvent
 };
 
 export const NotionEvents = {
   objectFetched: (objectId: string, objectType: string, size: number, duration: number): NotionObjectFetchedEvent =>
-    createDomainEvent('notion.object.fetched', objectId, 'NotionObject', { objectId, objectType, size, duration }) as NotionObjectFetchedEvent,
+    createDomainEvent("notion.object.fetched", objectId, "NotionObject", {
+      objectId,
+      objectType,
+      size,
+      duration
+    }) as NotionObjectFetchedEvent,
 
   rateLimitHit: (remaining: number, resetTime: Date, retryAfter?: number): NotionRateLimitHitEvent =>
-    createDomainEvent('notion.rate_limit.hit', 'rate-limiter', 'RateLimiter', { remaining, resetTime, retryAfter }) as NotionRateLimitHitEvent,
+    createDomainEvent("notion.rate_limit.hit", "rate-limiter", "RateLimiter", {
+      remaining,
+      resetTime,
+      retryAfter
+    }) as NotionRateLimitHitEvent,
 
   apiError: (error: ErrorInfo, endpoint: string, retryAttempt: number): NotionApiErrorEvent =>
-    createDomainEvent('notion.api.error', endpoint, 'NotionApi', { error, endpoint, retryAttempt }) as NotionApiErrorEvent
+    createDomainEvent("notion.api.error", endpoint, "NotionApi", {
+      error,
+      endpoint,
+      retryAttempt
+    }) as NotionApiErrorEvent
 };
 
 export const CircuitBreakerEvents = {
   opened: (name: string, failureCount: number, threshold: number): CircuitBreakerOpenedEvent =>
-    createDomainEvent('circuit_breaker.opened', name, 'CircuitBreaker', { name, failureCount, threshold }) as CircuitBreakerOpenedEvent,
+    createDomainEvent("circuit_breaker.opened", name, "CircuitBreaker", {
+      name,
+      failureCount,
+      threshold
+    }) as CircuitBreakerOpenedEvent,
 
   closed: (name: string, successCount: number): CircuitBreakerClosedEvent =>
-    createDomainEvent('circuit_breaker.closed', name, 'CircuitBreaker', { name, successCount }) as CircuitBreakerClosedEvent,
+    createDomainEvent("circuit_breaker.closed", name, "CircuitBreaker", {
+      name,
+      successCount
+    }) as CircuitBreakerClosedEvent,
 
   halfOpen: (name: string, nextAttemptTime: Date): CircuitBreakerHalfOpenEvent =>
-    createDomainEvent('circuit_breaker.half_open', name, 'CircuitBreaker', { name, nextAttemptTime }) as CircuitBreakerHalfOpenEvent
+    createDomainEvent("circuit_breaker.half_open", name, "CircuitBreaker", {
+      name,
+      nextAttemptTime
+    }) as CircuitBreakerHalfOpenEvent
 };
 
 export const ProgressEvents = {
   sectionStarted: (exportId: string, section: string, totalItems: number): ProgressSectionStartedEvent =>
-    createDomainEvent('progress.section.started', exportId, 'Progress', { exportId, section, totalItems }) as ProgressSectionStartedEvent,
+    createDomainEvent("progress.section.started", exportId, "Progress", {
+      exportId,
+      section,
+      totalItems
+    }) as ProgressSectionStartedEvent,
 
-  sectionCompleted: (exportId: string, section: string, itemsProcessed: number, duration: number, errors: ErrorInfo[]): ProgressSectionCompletedEvent =>
-    createDomainEvent('progress.section.completed', exportId, 'Progress', { exportId, section, itemsProcessed, duration, errors }) as ProgressSectionCompletedEvent,
+  sectionCompleted: (
+    exportId: string,
+    section: string,
+    itemsProcessed: number,
+    duration: number,
+    errors: ErrorInfo[]
+  ): ProgressSectionCompletedEvent =>
+    createDomainEvent("progress.section.completed", exportId, "Progress", {
+      exportId,
+      section,
+      itemsProcessed,
+      duration,
+      errors
+    }) as ProgressSectionCompletedEvent,
 
-  itemProcessed: (exportId: string, itemId: string, itemType: string, duration: number, success: boolean, error?: ErrorInfo): ProgressItemProcessedEvent =>
-    createDomainEvent('progress.item.processed', exportId, 'Progress', { exportId, itemId, itemType, duration, success, error }) as ProgressItemProcessedEvent
+  itemProcessed: (
+    exportId: string,
+    itemId: string,
+    itemType: string,
+    duration: number,
+    success: boolean,
+    error?: ErrorInfo
+  ): ProgressItemProcessedEvent =>
+    createDomainEvent("progress.item.processed", exportId, "Progress", {
+      exportId,
+      itemId,
+      itemType,
+      duration,
+      success,
+      error
+    }) as ProgressItemProcessedEvent
 };
 
 export const FileSystemEvents = {
   fileCreated: (path: string, size: number, mimeType?: string): FileCreatedEvent =>
-    createDomainEvent('file.created', path, 'File', { path, size, mimeType }) as FileCreatedEvent,
+    createDomainEvent("file.created", path, "File", { path, size, mimeType }) as FileCreatedEvent,
 
   fileUpdated: (path: string, oldSize: number, newSize: number): FileUpdatedEvent =>
-    createDomainEvent('file.updated', path, 'File', { path, oldSize, newSize }) as FileUpdatedEvent,
+    createDomainEvent("file.updated", path, "File", { path, oldSize, newSize }) as FileUpdatedEvent,
 
   directoryCreated: (path: string): DirectoryCreatedEvent =>
-    createDomainEvent('directory.created', path, 'Directory', { path }) as DirectoryCreatedEvent
+    createDomainEvent("directory.created", path, "Directory", { path }) as DirectoryCreatedEvent
 };
 
 export const PerformanceEvents = {
   metric: (metric: string, value: number, unit: string, tags?: Record<string, string>): PerformanceMetricEvent =>
-    createDomainEvent('performance.metric', metric, 'Performance', { metric, value, unit, tags }) as PerformanceMetricEvent,
+    createDomainEvent("performance.metric", metric, "Performance", {
+      metric,
+      value,
+      unit,
+      tags
+    }) as PerformanceMetricEvent,
 
-  concurrencyAdjusted: (operation: string, oldLimit: number, newLimit: number, reason: string): ConcurrencyAdjustedEvent =>
-    createDomainEvent('concurrency.adjusted', operation, 'Concurrency', { operation, oldLimit, newLimit, reason }) as ConcurrencyAdjustedEvent
+  concurrencyAdjusted: (
+    operation: string,
+    oldLimit: number,
+    newLimit: number,
+    reason: string
+  ): ConcurrencyAdjustedEvent =>
+    createDomainEvent("concurrency.adjusted", operation, "Concurrency", {
+      operation,
+      oldLimit,
+      newLimit,
+      reason
+    }) as ConcurrencyAdjustedEvent
 };

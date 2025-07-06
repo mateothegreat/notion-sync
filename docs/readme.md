@@ -13,6 +13,16 @@ Notion Sync is a tool for importing and exporting content to and from Notion.
 - 📊 Real-time performance monitoring and statistics tracking
 - ✅ Comprehensive fault tolerance with fallback mechanisms
 
+## Key Components Needed
+
+- Message Bus
+- State Registry
+- Component Factory
+- Circuit Breaker
+- Retry Mechanism
+- Rate Limiter
+- Plugin & Middleware system
+
 ## Main Implementation (workspace-exporter.ts)
 
 - Complete TypeScript implementation with full type safety.
@@ -27,7 +37,7 @@ Notion Sync is a tool for importing and exporting content to and from Notion.
 - Full test coverage using `vitest`.
 - Tests for all methods and edge cases.
 - Mocked Notion API responses.
-- Tests for error handling, pagination, and rate limiting.  
+- Tests for error handling, pagination, and rate limiting.
 
 ## Documentation (README.md)
 
@@ -63,35 +73,40 @@ You need to have a config file. You can create one by running `npx cmskit notion
 
 ## Installation
 
+```bash
+npm install @mateothegreat/notion-sync
+```
+
 ## Usage
 
-```bash
-npm install @cmskit/notion
-```
+### Get a Notion API Token
+
+You will need to create an internal Notion integration. You will also want to share your database with the integration.
+
+Your token will look like this: `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`
 
 ```ts
-import { notion } from "@cmskit/notion";
-```
-
-### Usage
-
-```bash
-npx cmskit notion config --token <your-notion-api-key>
-```
-
-```bash
-npx cmskit notion config
-```
-
-Apply to nginx-ssl-on...
-
-Run
-
-```bash
-npx cmskit notion export
+import { notion } from "@mateothegreat/notion-sync";
 ```
 
 ## Development
 
-> [!NOTE]
-> <https://www.postman.com/notionhq/workspace/notion-s-api-workspace>
+### Discovering the Notion API
+
+You can discover the API by using this postman collection at <https://www.postman.com/notionhq/workspace/notion-s-api-workspace>.
+
+#### Building
+
+First, start the typescript compiler in watch mode:
+
+```bash
+npm run compile:watch
+```
+
+Then, run the following command to start the application:
+
+#### Running
+
+```bash
+npm run start:dev
+```

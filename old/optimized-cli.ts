@@ -1,10 +1,10 @@
 import { Format } from "$lib/renderers/format";
-import { ETACalculator } from "../../../dump/bad/eta-calculator";
 import { PersistentProgressTracker, ProgressReporter } from "../progress-tracking";
 import type { OperationType } from "./concurrency-manager";
 import { OperationTypeAwareLimiter } from "./concurrency-manager";
+import { ETACalculator } from "./eta-calculator";
+import { NotionStreamingExporter } from "./manager";
 import { AdaptiveRateLimiter } from "./rate-limiting";
-import { StreamingExportManager } from "./streaming-export-manager";
 
 export interface OptimizedExportConfig {
   outputPath: string;
@@ -415,7 +415,7 @@ class RealTimeDisplayManager {
  * Main CLI interface that integrates all optimization components.
  */
 export class OptimizedNotionExportCLI {
-  private exportManager: StreamingExportManager;
+  private exportManager: NotionStreamingExporter;
   private rateLimiter: AdaptiveRateLimiter;
   private operationLimiter: OperationTypeAwareLimiter;
   private progressTracker: PersistentProgressTracker;
@@ -458,14 +458,7 @@ export class OptimizedNotionExportCLI {
     );
 
     // Initialize export manager
-    this.exportManager = new StreamingExportManager(
-      this.exportId,
-      config.outputPath,
-      (config.maxMemoryMB ?? 256) * 1024 * 1024,
-      config.checkpointInterval ?? 30000,
-      this.getCurrentLimits(),
-      config.format
-    );
+    this.exportManager = new NotionStreamingExporter(this.exportId, config.outputPath, this.getCurrentLimits());
 
     this.setupEventHandlers();
   }
