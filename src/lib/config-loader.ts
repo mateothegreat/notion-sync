@@ -1,5 +1,5 @@
 import { Flags } from "@oclif/core";
-import { FlagProps } from "node_modules/@oclif/core/lib/interfaces/parser";
+import { Flag } from "@oclif/core/interfaces";
 import path from "path";
 import { dotEnvAdapter } from "zod-config/dotenv-adapter";
 import { yamlAdapter } from "zod-config/yaml-adapter";
@@ -7,28 +7,33 @@ import * as z4 from "zod/v4";
 import { log } from "./log";
 
 /**
- * The config object.
+ * Configuration options for command-line flags and configuration parsing.
  */
-export type ParseableConfig = {
-  NOTION_TOKEN: string;
-  output?: string;
-  concurrency?: number;
-  depth?: number;
-  retries?: number;
-};
-
-export type Parseable = {
+export type ConfigOptions = {
+  /** The name of the configuration option. */
   name: string;
+  /** Alternative names that can be used for this configuration option. */
   variants: string[];
-  flag: FlagProps;
+  /** List of commands that this configuration option applies to. Use "*" for all commands. */
+  commands: string[];
+  /** The oclif flag definition for this configuration option. */
+  flag: Flag<any>;
+  /** A function that returns the Zod schema for validating this configuration option. */
   schema: () => z4.ZodType<any>;
+  /** Whether to enable debug logging for this configuration option. */
   debug?: boolean;
 };
 
-export const parseables: Record<string, Parseable> = {
+export type Config = z4.infer<ReturnType<typeof createConfigSchema>>;
+
+export const parseables: { [key: string]: ConfigOptions } = {
+  /**
+   * Flags that are available to all commands.
+   */
   flush: {
     name: "flush",
     variants: ["FLUSH", "flush"],
+    commands: ["*"],
     flag: Flags.boolean({
       description: "Flush stdout after each log instead of updating in place.",
       default: false
@@ -38,6 +43,7 @@ export const parseables: Record<string, Parseable> = {
   timeout: {
     name: "timeout",
     variants: ["TIMEOUT", "timeout"],
+    commands: ["*"],
     flag: Flags.integer({
       description: "Max run time in seconds.",
       default: 0
@@ -47,6 +53,7 @@ export const parseables: Record<string, Parseable> = {
   token: {
     name: "token",
     variants: ["notion_token", "token"],
+    commands: ["*"],
     flag: Flags.string({
       description: "Notion API integration token."
       // required: true
@@ -57,45 +64,56 @@ export const parseables: Record<string, Parseable> = {
           "The notion api token must be a 50 character string (i.e. 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)"
       })
   },
-  output: {
-    name: "output",
-    variants: ["OUTPUT", "output"],
-    flag: Flags.string({
-      description: "Output directory.",
-      default: `./notion-export-${new Date().toISOString()}`
+  verbose: {
+    name: "verbose",
+    variants: ["VERBOSE", "verbose"],
+    commands: ["*"],
+    flag: Flags.boolean({
+      char: "v",
+      description: "Enable verbose logging.",
+      default: false
     }),
-    schema: () => z4.string()
+    schema: () => z4.boolean()
   },
   concurrency: {
     name: "concurrency",
     variants: ["CONCURRENCY", "concurrency"],
+    commands: ["*"],
     flag: Flags.integer({
       description: "Maximum number of concurrent requests.",
-      default: async () => config.concurrency || 10
-    }),
-    schema: () => z4.number()
-  },
-  depth: {
-    name: "depth",
-    variants: ["DEPTH", "depth"],
-    flag: Flags.integer({
-      description: "Maximum depth of the export.",
-      default: async () => config.depth || 1
+      default: 10
     }),
     schema: () => z4.number()
   },
   retries: {
     name: "retries",
     variants: ["RETRIES", "retries"],
+    commands: ["*"],
     flag: Flags.integer({
       description: "Maximum number of retries.",
-      default: async () => config.retries || 3
+      default: 3
     }),
     schema: () => z4.number()
+  },
+
+  /**
+   * Export specific flags.
+   */
+  path: {
+    name: "path",
+    variants: ["path"],
+    commands: ["export"],
+    flag: Flags.string({
+      char: "p",
+      description: "Output directory path for exported files.",
+      default: `./notion-export-${new Date().toISOString().split("T")[0]}`
+    }),
+    schema: () => z4.string()
   },
   databases: {
     name: "databases",
     variants: ["databases"],
+    commands: ["export"],
     flag: Flags.custom<Array<{ name: string; id: string }>>({
       char: "d",
       description:
@@ -104,84 +122,172 @@ export const parseables: Record<string, Parseable> = {
         // Parse comma-separated database IDs
         return input.split(",").map((id) => ({ name: "", id: id.trim() }));
       }
+    })(),
+    schema: () => z4.array(z4.object({ name: z4.string(), id: z4.string() })).optional()
+  },
+  pages: {
+    name: "pages",
+    variants: ["pages"],
+    commands: ["export"],
+    flag: Flags.string({
+      description: "Comma-separated list of page IDs to export.",
+      parse: async (input) => input
     }),
-    schema: () =>
-      z4.array(
-        z4.object({
-          name: z4.string().optional(),
-          id: z4.string()
-        })
-      )
+    schema: () => z4.string().optional()
+  },
+  format: {
+    name: "format",
+    variants: ["format"],
+    commands: ["export"],
+    flag: Flags.string({
+      char: "f",
+      description: "Export format.",
+      options: ["json", "markdown", "html", "csv"],
+      default: "json"
+    }),
+    schema: () => z4.enum(["json", "markdown", "html", "csv"])
+  },
+  "max-concurrency": {
+    name: "max-concurrency",
+    variants: ["max-concurrency"],
+    commands: ["export"],
+    flag: Flags.integer({
+      description: "Maximum number of concurrent requests for export.",
+      default: 10
+    }),
+    schema: () => z4.number()
+  },
+  "include-blocks": {
+    name: "include-blocks",
+    variants: ["include-blocks"],
+    commands: ["export"],
+    flag: Flags.boolean({
+      description: "Include block content in export.",
+      default: true
+    }),
+    schema: () => z4.boolean()
+  },
+  "include-comments": {
+    name: "include-comments",
+    variants: ["include-comments"],
+    commands: ["export"],
+    flag: Flags.boolean({
+      description: "Include comments in export.",
+      default: false
+    }),
+    schema: () => z4.boolean()
+  },
+  "include-properties": {
+    name: "include-properties",
+    variants: ["include-properties"],
+    commands: ["export"],
+    flag: Flags.boolean({
+      description: "Include all properties in export.",
+      default: true
+    }),
+    schema: () => z4.boolean()
+  },
+
+  /**
+   * Legacy output flag (maps to path for export command).
+   */
+  output: {
+    name: "output",
+    variants: ["OUTPUT", "output"],
+    commands: ["export"],
+    flag: Flags.string({
+      description: "Output directory (alias for --path).",
+      default: `./notion-export-${new Date().toISOString().split("T")[0]}`
+    }),
+    schema: () => z4.string()
   }
 };
 
-export type ResolvedConfig = {
-  token: string;
-  output?: string;
-  concurrency?: number;
-  depth?: number;
-  retries?: number;
-  databases?: Array<{ name: string; id: string }>;
+// ================================================================
+// Command-Specific Flag Extraction Types and Functions
+// ================================================================
+
+/**
+ * Extract flag names that are available for a specific command.
+ */
+type ExtractFlagKeysForCommand<TCommand extends string> = {
+  [K in keyof typeof parseables]: (typeof parseables)[K]["commands"] extends readonly string[]
+    ? "*" extends (typeof parseables)[K]["commands"][number]
+      ? K
+      : TCommand extends (typeof parseables)[K]["commands"][number]
+      ? K
+      : never
+    : never;
+}[keyof typeof parseables];
+
+/**
+ * Type for command-specific flags object.
+ */
+export type CommandFlags<TCommand extends string> = {
+  [K in ExtractFlagKeysForCommand<TCommand>]: (typeof parseables)[K]["flag"];
 };
 
 /**
- * Maps various input property names to standardized config properties.
- *
- * @param rawConfig - The raw config object with potentially varied property names
- * @returns A ResolvedConfig object with standardized property names
+ * Type for inferring the keys that will be available for a command.
  */
-export const mapConfigProperties = (rawConfig: Record<string, any>): ResolvedConfig => {
-  const resolvedConfig: Partial<ResolvedConfig> = {};
+export type CommandFlagKeys<TCommand extends string> = ExtractFlagKeysForCommand<TCommand>;
 
-  // Iterate through each property mapping.
-  for (const [targetProperty, sourceVariations] of Object.entries(parseables)) {
-    for (const sourceProperty of sourceVariations.variants) {
-      if (rawConfig[sourceProperty] !== undefined) {
-        const value = rawConfig[sourceProperty];
+/**
+ * Extracts flags available for a specific command.
+ *
+ * @param commandName - The name of the command to extract flags for
+ * @returns Object containing only the flags available for the specified command
+ */
+export function extractFlagsForCommand<TCommand extends string>(commandName: TCommand): CommandFlags<TCommand> {
+  const commandFlags: Record<string, Flag<any>> = {};
 
-        // Handle type conversion and assignment with proper typing.
-        switch (targetProperty) {
-          case "token":
-            resolvedConfig.token = value;
-            break;
-          case "output":
-            resolvedConfig.output = value;
-            break;
-          case "concurrency":
-            resolvedConfig.concurrency = typeof value === "string" ? parseInt(value) : value;
-            break;
-          case "depth":
-            resolvedConfig.depth = typeof value === "string" ? parseInt(value) : value;
-            break;
-          case "retries":
-            resolvedConfig.retries = typeof value === "string" ? parseInt(value) : value;
-            break;
-          case "databases":
-            resolvedConfig.databases = value;
-            break;
-        }
+  for (const [flagKey, flagConfig] of Object.entries(parseables)) {
+    const isGlobalFlag = flagConfig.commands.includes("*");
+    const isCommandFlag = flagConfig.commands.includes(commandName);
 
-        // Use the first found value (maintains precedence).
-        break;
-      }
+    if (isGlobalFlag || isCommandFlag) {
+      commandFlags[flagKey] = flagConfig.flag;
     }
   }
 
-  // Validate required fields.
-  // if (!resolvedConfig.token) {
-  //   throw new Error("NOTION_TOKEN or TOKEN environment variable is required");
-  // }
+  return commandFlags as CommandFlags<TCommand>;
+}
 
-  return resolvedConfig as ResolvedConfig;
-};
+/**
+ * Gets all available flag keys for a command (includes global flags).
+ *
+ * @param commandName - The name of the command
+ * @returns Array of flag keys available for the command
+ */
+export function getCommandFlagKeys<TCommand extends string>(commandName: TCommand): CommandFlagKeys<TCommand>[] {
+  const flagKeys: string[] = [];
 
-// const injectInspection = (schema: () => z4.ZodType<any>) => {
-//   console.log("🔍 Injecting inspection for:", schema, schema().description, schema().meta);
-//   return z4.preprocess((value) => {
-//     console.log("🔍 Inspecting:", value);
-//     return value;
-//   }, schema());
-// };
+  for (const [flagKey, flagConfig] of Object.entries(parseables)) {
+    const isGlobalFlag = flagConfig.commands.includes("*");
+    const isCommandFlag = flagConfig.commands.includes(commandName);
+
+    if (isGlobalFlag || isCommandFlag) {
+      flagKeys.push(flagKey);
+    }
+  }
+
+  return flagKeys as CommandFlagKeys<TCommand>[];
+}
+
+/**
+ * Helper function to create typed flags for a command.
+ * This is the main function commands should use.
+ *
+ * @param commandName - The name of the command
+ * @returns Typed flags object for the command
+ */
+export function createCommandFlags<TCommand extends string>(commandName: TCommand) {
+  return extractFlagsForCommand(commandName);
+}
+
+// ================================================================
+// Schema and Config Functions (Existing)
+// ================================================================
 
 /**
  * Creates a complete schema object based on the parseables configuration.
@@ -194,8 +300,6 @@ export const createConfigSchema = () => {
   // Create schema entries for ALL possible input variations.
   for (const name in parseables) {
     for (const variant of parseables[name].variants) {
-      // schema[name] = injectInspection(parseables[name].schema);
-
       if (parseables[name].debug) {
         schema[name] = z4.preprocess((value) => {
           console.log("🔍 Inspecting:", name, value);
@@ -205,36 +309,6 @@ export const createConfigSchema = () => {
         schema[name] = parseables[name].schema().optional();
       }
     }
-
-    // for (const sourceName of sourceVariations.names) {
-    //   // Add preprocessing to inspect values BEFORE validation.
-    //   const baseSchema = sourceVariations.schema();
-    //   const schemaWithInspection = z4.preprocess((value) => {
-    //     console.log(
-    //       `🔍 Inspecting ${sourceName} (target: ${targetProperty}):`,
-    //       typeof value,
-    //       Array.isArray(value) ? `Array[${value.length}]` : value
-    //     );
-    //     return value;
-    //   }, baseSchema);
-
-    //   // For string/number properties that come from env vars, we need to handle them as strings initially
-    //   // since environment variables are always strings.
-    //   if (targetProperty === "token") {
-    //     schemaObject[sourceName] = schemaWithInspection.optional();
-    //   } else if (["concurrency", "depth", "retries"].includes(targetProperty)) {
-    //     // Numbers can come as strings from env vars, so accept both
-    //     schemaObject[sourceName] = z4.union([z4.string(), z4.number()]).optional();
-    //   } else if (targetProperty === "databases") {
-    //     // Use the custom array schema for databases.
-    //     schemaObject[sourceName] = schemaWithInspection.optional();
-    //   } else {
-    //     // String properties.
-    //     schemaObject[sourceName] = z4.string().optional();
-    //   }
-
-    //     schemaObject[sourceName] = sourceVariations[sourceName].schema;
-    // }
   }
 
   return z4.object(schema);
@@ -259,14 +333,14 @@ export const createConfigSchema = () => {
  *
  * @returns The config object.
  */
-export const loadConfig = async (): Promise<ResolvedConfig> => {
+export const loadConfig = async (): Promise<Config> => {
   try {
     const { loadConfigSync } = await import("zod-config");
     const { envAdapter } = await import("zod-config/env-adapter");
 
     const schema = createConfigSchema();
 
-    const rawConfig = loadConfigSync({
+    const loadedConfig = loadConfigSync({
       schema,
       adapters: [
         // YAML file is read first.
@@ -284,28 +358,14 @@ export const loadConfig = async (): Promise<ResolvedConfig> => {
       ]
     });
 
-    // log.debug.inspect("rawConfig", rawConfig);
-
-    // Use the central mapping method.
-    const resolvedConfig = mapConfigProperties(rawConfig);
-
-    // log.debug.inspect("resolvedConfig", resolvedConfig);
-    log.debug.inspect("fallbackConfig", resolvedConfig);
-
-    return resolvedConfig;
+    return loadedConfig;
   } catch (error) {
     log.error("Config loading failed, falling back to environment variables:", error);
-
-    // Use the central mapping method for fallback as well.
-    const fallbackConfig = mapConfigProperties(process.env);
-
-    return fallbackConfig;
+    throw error;
   }
 };
 
 export const config = await loadConfig();
-
-log.debug.inspect("final config", config);
 
 /**
  * Creates a flag that uses config values as defaults when the flag is not provided.
@@ -317,3 +377,10 @@ log.debug.inspect("final config", config);
 export function resolveFlags(flags: Record<string, any>): Record<string, any> {
   return flags;
 }
+
+export const compileConfig = (flags: Record<string, any>) => {
+  return {
+    ...config,
+    ...flags
+  };
+};

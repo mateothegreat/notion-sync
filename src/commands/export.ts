@@ -3,25 +3,21 @@
  *
  * CLI command for exporting Notion content using the new event-driven architecture
  */
-import { Flags } from "@oclif/core";
 import chalk from "chalk";
 import { promises as fs } from "fs";
 import path from "path";
 import { inspect } from "util";
 
-import { config as configLoaded, resolveFlags } from "$lib/config-loader";
-import { log } from "$lib/log.js";
-import { getObjects, ObjectsEnum } from "$lib/objects/types.js";
-import { ExportService } from "../core/services/export-service.js";
-import { ProgressService } from "../core/services/progress-service.js";
-import { NotionClient } from "../infrastructure/notion/notion-client.js";
-import { BaseCommand } from "../lib/commands/base-command.js";
-import { ControlPlane, createControlPlane } from "../lib/control-plane/control-plane.js";
-import { ExportConfiguration, ExportFormat, NotionConfig } from "../shared/types/index.js";
+import { compileConfig, Config, config as configLoaded, createCommandFlags } from "$lib/config-loader";
+import { ExportService } from "../core/services/export-service";
+import { ProgressService } from "../core/services/progress-service";
+import { NotionClient } from "../infrastructure/notion/notion-client";
+import { BaseCommand } from "../lib/commands/base-command";
+import { ControlPlane, createControlPlane } from "../lib/control-plane/control-plane";
+import { ExportConfiguration, ExportFormat, NotionConfig } from "../shared/types";
 
 export default class Export extends BaseCommand<typeof Export> {
   static override description = "Export Notion content using the new event-driven architecture";
-
   static override examples = [
     "<%= config.bin %> <%= command.id %> --path ./exports",
     "<%= config.bin %> <%= command.id %> --path ./exports --databases db1,db2",
@@ -29,80 +25,32 @@ export default class Export extends BaseCommand<typeof Export> {
     "<%= config.bin %> <%= command.id %> --path ./exports --format json"
   ];
 
-  static override flags = {
-    path: Flags.string({
-      char: "p",
-      description: "\nPath to the directory where the outputs will be saved.",
-      default: `./notion-export-${new Date().toISOString().split("T")[0]}`,
-      required: true
-    }),
-    databases: Flags.string({
-      char: "d",
-      description: "Comma-separated list of database IDs to export."
-    }),
-    objects: Flags.string({
-      description: "\nObjects to export (if not provided, all objects will be exported by default).",
-      options: getObjects(Object.values(ObjectsEnum).join(",")),
-      default: Object.values(ObjectsEnum).join(","),
-      required: true
-    }),
-    pages: Flags.string({
-      char: "p",
-      description: "Comma-separated list of page IDs to export."
-    }),
-    format: Flags.string({
-      char: "f",
-      description: "\nFormat of the exported data.",
-      options: ["json", "markdown", "html", "csv"],
-      default: "json"
-    }),
-    "include-blocks": Flags.boolean({
-      description: "\nInclude block content in export.",
-      default: true
-    }),
-    "include-comments": Flags.boolean({
-      description: "\nInclude comments in export.",
-      default: false
-    }),
-    "include-properties": Flags.boolean({
-      description: "\nInclude all properties in export.",
-      default: true
-    }),
-    resume: Flags.boolean({
-      description: "\nResume a previous export if checkpoint exists.",
-      default: false
-    }),
-    "max-concurrency": Flags.integer({
-      description: "\nMaximum number of concurrent requests.",
-      default: 10
-    }),
-    verbose: Flags.boolean({
-      char: "v",
-      description: "Enable verbose logging.",
-      default: false
-    })
-  };
+  /**
+   * Export-specific flags extracted dynamically based on command name.
+   * This automatically includes all global flags (*) and export-specific flags.
+   */
+  static override flags = createCommandFlags("export");
 
   private controlPlane?: ControlPlane;
   private exportService?: ExportService;
   private progressService?: ProgressService;
   private notionClient?: NotionClient;
+  private resolvedConfig: any;
 
   public async run(): Promise<void> {
-    const { args, flags } = await this.parse(Export);
-    log.debug.inspect("flags", flags);
+    const { args, flags } = await this.parse<Config, (typeof Export)["flags"], (typeof Export)["args"]>(Export);
 
-    const config = resolveFlags(flags);
+    this.resolvedConfig = compileConfig(flags);
 
     try {
       // Parse databases and pages
       let databases: string[];
 
       if (flags.databases) {
-        // If provided via CLI, parse comma-separated string
+        // If provided via CLI, parse comma-separated string.
         databases = flags.databases.split(",").map((id: string) => id.trim());
       } else if (configLoaded.databases && configLoaded.databases.length > 0) {
-        // If not provided, use databases from config file
+        // If not provided, use databases from config file.
         databases = configLoaded.databases.map((db: { name: string; id: string }) => db.id);
       } else {
         databases = [];
@@ -114,7 +62,7 @@ export default class Export extends BaseCommand<typeof Export> {
         this.error("At least one database or page must be specified");
       }
 
-      // Create output directory
+      // Create output directory.
       const outputPath = path.resolve(flags.path);
       await fs.mkdir(outputPath, { recursive: true });
 
@@ -125,13 +73,13 @@ export default class Export extends BaseCommand<typeof Export> {
       this.log(`📦 Format: ${chalk.yellow(flags.format)}`);
       this.log(chalk.gray("━".repeat(50)));
 
-      // Initialize control plane and services
-      await this.initializeServices(flags.token as string, flags);
+      // Initialize control plane and services.
+      await this.initializeServices();
 
-      // Set up progress monitoring
+      // Set up progress monitoring.
       this.setupProgressMonitoring();
 
-      // Create export configuration
+      // Create export configuration.
       const exportConfiguration: ExportConfiguration = {
         outputPath,
         format: flags.format as ExportFormat,
@@ -142,7 +90,7 @@ export default class Export extends BaseCommand<typeof Export> {
         pages
       };
 
-      // Start export process
+      // Start export process.
       await this.executeExport(exportConfiguration);
 
       this.log(chalk.green("\n✅ Export completed successfully!"));
@@ -158,7 +106,7 @@ export default class Export extends BaseCommand<typeof Export> {
         this.error(chalk.red("❌ Export failed with unknown error"));
       }
     } finally {
-      // Clean up
+      // Clean up.
       if (this.controlPlane) {
         await this.controlPlane.destroy();
       }
@@ -168,12 +116,12 @@ export default class Export extends BaseCommand<typeof Export> {
   /**
    * Initialize control plane and all services.
    */
-  private async initializeServices(apiKey: string, flags: any): Promise<void> {
+  private async initializeServices(): Promise<void> {
     this.log("🔧 Initializing control plane...");
 
-    // Create control plane
+    // Create control plane.
     this.controlPlane = createControlPlane({
-      enableLogging: flags.verbose,
+      enableLogging: this.resolvedConfig.verbose,
       enableMetrics: true,
       enableHealthCheck: true,
       autoStartComponents: true
@@ -182,32 +130,45 @@ export default class Export extends BaseCommand<typeof Export> {
     await this.controlPlane.initialize();
     await this.controlPlane.start();
 
-    // Create notion configuration
+    // Create notion configuration.
     const notionConfig: NotionConfig = {
-      apiKey,
+      apiKey: this.resolvedConfig.token,
       apiVersion: "2022-06-28",
       baseUrl: "https://api.notion.com",
       timeout: 30000,
       retryAttempts: 3
     };
 
-    // Create circuit breaker for Notion API
+    // Create circuit breaker for Notion API.
     const circuitBreaker = this.controlPlane.getCircuitBreaker("notion-api", {
       failureThreshold: 5,
       resetTimeout: 30000,
       monitoringPeriod: 60000
     });
 
-    // Create event publisher
+    /**
+     * Create event publisher for publishing domain events.
+     * This is used to publish events to the control plane.
+     */
     const eventPublisher = async (event: any) => {
       await this.controlPlane!.publish("domain-events", event);
     };
 
-    // Initialize services
+    /**
+     * Create notion client for fetching data from the Notion API.
+     */
     this.notionClient = new NotionClient(notionConfig, eventPublisher, circuitBreaker);
+
+    /**
+     * Create progress service.
+     * This is used to track the progress of the export.
+     */
     this.progressService = new ProgressService(eventPublisher);
 
-    // For export service, we need to create a simple in-memory repository
+    /**
+     * Create export service.
+     * This is used to export data from the various services to the output directory.
+     */
     const exportRepository = this.createInMemoryExportRepository();
     this.exportService = new ExportService(exportRepository, eventPublisher);
 
@@ -216,13 +177,15 @@ export default class Export extends BaseCommand<typeof Export> {
 
   /**
    * Set up progress monitoring for export events.
+   * This is used to track the progress of the export.
    */
   private setupProgressMonitoring(): void {
-    if (!this.controlPlane) return;
-
     let lastProgress = 0;
 
-    // Subscribe to domain events
+    /**
+     * Subscribe to domain events so we can track the progress of the various
+     * services and sections of the export.
+     */
     this.controlPlane.subscribe("domain-events", async (message) => {
       const event = message.payload as any;
 
@@ -235,7 +198,7 @@ export default class Export extends BaseCommand<typeof Export> {
           const progress = event.payload?.progress;
           if (!progress) break;
 
-          // Only show progress updates every 10%
+          // Only show progress updates every 10% to avoid spamming the console.
           const currentProgress = Math.floor(progress.percentage / 10) * 10;
           if (currentProgress > lastProgress) {
             this.log(
@@ -340,29 +303,47 @@ export default class Export extends BaseCommand<typeof Export> {
       throw new Error("Services not initialized");
     }
 
-    // Create export
-    this.log("📝 Creating export...");
+    /**
+     * Create export.
+     * This is used to create the export.
+     */
+    this.log("📝 Creating export job...");
     const export_ = await this.exportService.createExport(configuration);
     this.log(`✅ Export created with ID: ${chalk.cyan(export_.id)}`);
 
-    // Start progress tracking
+    /**
+     * Start progress tracking.
+     * This is used to track the progress of the export.
+     */
     await this.progressService.startTracking(export_.id);
 
-    // Start export
+    /**
+     * Start export.
+     * This is used to start the export process.
+     */
     this.log("🚀 Starting export...");
     await this.exportService.startExport(export_.id);
 
-    // Process databases
+    /**
+     * Process databases.
+     * This is used to process the databases for export.
+     */
     if (configuration.databases.length > 0) {
       await this.processDatabases(export_.id, configuration.databases);
     }
 
-    // Process pages
+    /**
+     * Process pages.
+     * This is used to process the pages for export.
+     */
     if (configuration.pages.length > 0) {
       await this.processPages(export_.id, configuration.pages);
     }
 
-    // Complete export
+    /**
+     * Complete export.
+     * This is used to complete the export process.
+     */
     await this.exportService.completeExport(export_.id, configuration.outputPath);
     this.progressService.stopTracking(export_.id);
   }
@@ -379,7 +360,7 @@ export default class Export extends BaseCommand<typeof Export> {
       try {
         const database = await this.notionClient.getDatabase(databaseId);
 
-        // Write database to output
+        // Write database to output.
         await this.writeToOutput(database, "database");
 
         await this.progressService.updateSectionProgress(exportId, "databases", 1);
@@ -435,8 +416,8 @@ export default class Export extends BaseCommand<typeof Export> {
    * Write data to output file.
    */
   private async writeToOutput(data: any, type: string): Promise<void> {
-    // For now, we'll just log the data
-    // In a real implementation, this would write to files based on the format
+    // For now, we'll just log the data.
+    // In a real implementation, this would write to files based on the format.
     this.log(`📄 Exported ${type}: ${data.id}`);
   }
 

@@ -1,4 +1,4 @@
-import { parseables } from "$lib/config-loader";
+import { createCommandFlags } from "$lib/config-loader";
 import { Command, Interfaces } from "@oclif/core";
 import { Flag } from "@oclif/core/interfaces";
 
@@ -8,9 +8,11 @@ export type Args<T extends typeof Command> = Interfaces.InferredArgs<T["args"]>;
 export abstract class BaseCommand<T extends typeof Command> extends Command {
   static enableJsonFlag = true;
 
-  static baseFlags: Record<string, Flag<any>> = Object.fromEntries(
-    Object.entries(parseables).map(([key, value]) => [key, value.flag as Flag<unknown>])
-  );
+  /**
+   * Base flags available to all commands (global flags).
+   * These are automatically extracted from parseables for commands marked with "*".
+   */
+  static baseFlags: Record<string, Flag<any>> = createCommandFlags("*");
 
   protected flags!: Flags<T>;
   protected args!: Args<T>;

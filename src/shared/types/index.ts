@@ -4,6 +4,8 @@
  * Core types used throughout the application
  */
 
+import { config } from "$lib/config-loader";
+
 // Base types
 export interface Entity {
   id: string;
@@ -79,10 +81,10 @@ export interface ErrorInfo {
 export interface ExportConfiguration {
   outputPath: string;
   format: ExportFormat;
-  includeBlocks: boolean;
-  includeComments: boolean;
-  includeProperties: boolean;
-  databases: string[];
+  includeBlocks: typeof config.includeBlocks;
+  includeComments: typeof config.includeComments;
+  includeProperties: typeof config.includeProperties;
+  databases: typeof config.databases;
   pages: string[];
   filters?: ExportFilters;
 }

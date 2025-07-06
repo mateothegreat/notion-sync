@@ -89,6 +89,8 @@ Your token will look like this: `ntn_577683388018vMnDXfLs3UOm0rK3CMvbeijeFRJyprR
 import { notion } from "@mateothegreat/notion-sync";
 ```
 
+![get id](2025-07-06-01-17-38.png)
+
 ## Development
 
 ### Discovering the Notion API

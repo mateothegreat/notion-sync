@@ -4,6 +4,7 @@
  * Infrastructure layer for Notion API integration using the control plane
  */
 
+import { log } from "$lib/log";
 import { Client } from "@notionhq/client";
 import { NotionEvents } from "../../core/events/index";
 import { ErrorFactory, NotionApiError, RateLimitError } from "../../shared/errors/index";
@@ -58,14 +59,14 @@ export class NotionClient implements NotionApiClient {
   }
 
   async getDatabase(databaseId: string): Promise<NotionDatabase> {
-    return this.executeWithProtection("getDatabase", async () => {
+    return this.executeWithProtection(`getDatabase for ${databaseId}`, async () => {
       const startTime = Date.now();
 
       try {
         const response = await this.client.databases.retrieve({ database_id: databaseId });
         const database = this.transformDatabase(response);
-
         const duration = Date.now() - startTime;
+
         await this.publishObjectFetched(databaseId, "database", JSON.stringify(response).length, duration);
 
         return database;
@@ -80,7 +81,7 @@ export class NotionClient implements NotionApiClient {
     databaseId: string,
     options: any = {}
   ): Promise<{ results: NotionPage[]; hasMore: boolean; nextCursor?: string }> {
-    return this.executeWithProtection("queryDatabase", async () => {
+    return this.executeWithProtection(`queryDatabase for ${databaseId}`, async () => {
       const startTime = Date.now();
 
       try {
@@ -110,7 +111,7 @@ export class NotionClient implements NotionApiClient {
   }
 
   async getBlocks(blockId: string): Promise<{ results: NotionBlock[]; hasMore: boolean; nextCursor?: string }> {
-    return this.executeWithProtection("getBlocks", async () => {
+    return this.executeWithProtection(`getBlocks for ${blockId}`, async () => {
       const startTime = Date.now();
 
       try {
@@ -183,6 +184,7 @@ export class NotionClient implements NotionApiClient {
 
   private async executeWithProtection<T>(operation: string, fn: () => Promise<T>): Promise<T> {
     return this.circuitBreaker.execute(async () => {
+      log.debug(`Executing ${operation}`, { operation });
       try {
         const result = await fn();
         this.updateRateLimitFromResponse();
@@ -191,6 +193,7 @@ export class NotionClient implements NotionApiClient {
         if (this.isRateLimitError(error)) {
           await this.handleRateLimitError(error);
         }
+        log.error(`${operation} failed`, { operation, error });
         throw this.transformError(error);
       }
     });
@@ -253,7 +256,7 @@ export class NotionClient implements NotionApiClient {
       return object.title.map((text: any) => text.plain_text).join("");
     }
 
-    return "Untitled";
+    return "";
   }
 
   private extractDescription(object: any): string {
