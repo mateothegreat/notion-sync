@@ -1,4 +1,4 @@
-import { ObjectType } from "$lib/objects/types";
+import { ObjectType } from "../objects/types";
 
 export class BaseConfig {
   /**

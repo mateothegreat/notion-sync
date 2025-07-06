@@ -1,18 +1,11 @@
 /**
  * Message Bus Implementation
- * 
+ *
  * Provides centralized message routing with RxJS-based channels
  */
 
-import { Observable, Subject, BehaviorSubject, filter, map, catchError, of, EMPTY } from 'rxjs';
-import { 
-  Message, 
-  Channel, 
-  BusChannel, 
-  MessageHandler, 
-  MessageRoutingError,
-  Middleware 
-} from './types';
+import { Subject } from "rxjs";
+import { BusChannel, Channel, Message, MessageHandler, MessageRoutingError, Middleware } from "./types";
 
 /**
  * Message bus adapter interface for different backends
@@ -105,21 +98,14 @@ export class MessageBus {
       await this.processMiddleware(message);
       await this.adapter.publish(channel, message);
     } catch (error) {
-      throw new MessageRoutingError(
-        `Failed to publish message to channel ${channel}`,
-        message.id,
-        error as Error
-      );
+      throw new MessageRoutingError(`Failed to publish message to channel ${channel}`, message.id, error as Error);
     }
   }
 
   /**
    * Subscribe to messages on a channel
    */
-  async subscribe<T>(
-    channel: string, 
-    handler: MessageHandler<T>
-  ): Promise<() => void> {
+  async subscribe<T>(channel: string, handler: MessageHandler<T>): Promise<() => void> {
     const wrappedHandler: MessageHandler<T> = async (message) => {
       try {
         await this.processMiddleware(message);
@@ -183,7 +169,7 @@ export class MessageBusChannel<T> implements Channel<T> {
 
   private async setupBusSubscription() {
     try {
-      this.busSubscription = await this.bus.subscribe(this.name, (message) => {
+      this.busSubscription = await this.bus.subscribe(this.name, (message: Message) => {
         this.subject.next(message.payload);
       });
     } catch (error) {
@@ -253,7 +239,7 @@ export class PromiseBusChannel<T> implements BusChannel<T> {
     });
 
     // Subscribe to the message bus
-    this.unsubscribeFromBus = await this.bus.subscribe(this.name, (message) => {
+    this.unsubscribeFromBus = await this.bus.subscribe(this.name, (message: Message) => {
       this.subject.next(message.payload);
     });
 
@@ -299,18 +285,20 @@ export class BrokerBus {
    */
   channel<T>(name: string): Subject<T> {
     const subject = new Subject<T>();
-    
+
     // Set up subscription from bus to subject (one-way)
-    this.bus.subscribe(name, (message) => {
-      subject.next(message.payload);
-    }).catch(error => {
-      console.error(`Error setting up channel subscription for ${name}:`, error);
-    });
+    this.bus
+      .subscribe(name, (message: Message) => {
+        subject.next(message.payload);
+      })
+      .catch((error) => {
+        console.error(`Error setting up channel subscription for ${name}:`, error);
+      });
 
     // Override next to publish to bus only (don't emit locally to avoid loop)
     const originalNext = subject.next.bind(subject);
     subject.next = (value: T) => {
-      this.bus.publish(name, value).catch(error => {
+      this.bus.publish(name, value).catch((error) => {
         console.error(`Error publishing to channel ${name}:`, error);
       });
       // Don't call originalNext here to avoid feedback loop

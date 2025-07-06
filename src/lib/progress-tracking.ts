@@ -361,7 +361,10 @@ export class ProgressReporter {
   private lastReportTime = 0;
   private reportInterval: number;
 
-  constructor(private tracker: PersistentProgressTracker, reportInterval: number = 5000) {
+  constructor(
+    private tracker: PersistentProgressTracker,
+    reportInterval: number = 5000
+  ) {
     this.reportInterval = reportInterval;
   }
 

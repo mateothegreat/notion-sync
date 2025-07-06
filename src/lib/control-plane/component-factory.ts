@@ -1,10 +1,10 @@
 /**
  * Component Factory Implementation
- * 
+ *
  * Provides component creation, lifecycle management, and dependency injection
  */
 
-import { Component, ComponentConfig, ComponentState, ComponentError } from './types';
+import { Component, ComponentConfig, ComponentState, ComponentError } from "./types";
 
 /**
  * Dependency injection container
@@ -33,13 +33,13 @@ export class DIContainer {
 
     if (singleton) {
       if (!this.singletons.has(token)) {
-        const instance = typeof provider === 'function' ? provider() : provider;
+        const instance = typeof provider === "function" ? provider() : provider;
         this.singletons.set(token, instance);
       }
       return this.singletons.get(token);
     }
 
-    return typeof provider === 'function' ? provider() : provider;
+    return typeof provider === "function" ? provider() : provider;
   }
 
   /**
@@ -62,7 +62,7 @@ export class DIContainer {
  * Component wrapper for lifecycle management
  */
 class ComponentWrapper {
-  public state: ComponentState = 'created';
+  public state: ComponentState = "created";
   private dependencies: ComponentWrapper[] = [];
 
   constructor(
@@ -88,7 +88,7 @@ class ComponentWrapper {
    * Initialize the component
    */
   async initialize(): Promise<void> {
-    if (this.state !== 'created') {
+    if (this.state !== "created") {
       throw new ComponentError(
         `Cannot initialize component ${this.component.name} in state ${this.state}`,
         this.component.id
@@ -98,7 +98,7 @@ class ComponentWrapper {
     try {
       // Initialize dependencies first
       for (const dep of this.dependencies) {
-        if (dep.state === 'created') {
+        if (dep.state === "created") {
           await dep.initialize();
         }
       }
@@ -107,8 +107,8 @@ class ComponentWrapper {
         await this.component.initialize();
       }
 
-      this.state = 'initialized';
-      this.component.state = 'initialized';
+      this.state = "initialized";
+      this.component.state = "initialized";
     } catch (error) {
       throw new ComponentError(
         `Failed to initialize component ${this.component.name}`,
@@ -122,7 +122,7 @@ class ComponentWrapper {
    * Start the component
    */
   async start(): Promise<void> {
-    if (this.state !== 'initialized') {
+    if (this.state !== "initialized") {
       throw new ComponentError(
         `Cannot start component ${this.component.name} in state ${this.state}`,
         this.component.id
@@ -132,7 +132,7 @@ class ComponentWrapper {
     try {
       // Start dependencies first
       for (const dep of this.dependencies) {
-        if (dep.state === 'initialized') {
+        if (dep.state === "initialized") {
           await dep.start();
         }
       }
@@ -141,14 +141,10 @@ class ComponentWrapper {
         await this.component.start();
       }
 
-      this.state = 'started';
-      this.component.state = 'started';
+      this.state = "started";
+      this.component.state = "started";
     } catch (error) {
-      throw new ComponentError(
-        `Failed to start component ${this.component.name}`,
-        this.component.id,
-        error as Error
-      );
+      throw new ComponentError(`Failed to start component ${this.component.name}`, this.component.id, error as Error);
     }
   }
 
@@ -156,7 +152,7 @@ class ComponentWrapper {
    * Stop the component
    */
   async stop(): Promise<void> {
-    if (this.state !== 'started') {
+    if (this.state !== "started") {
       return; // Already stopped or not started
     }
 
@@ -167,19 +163,15 @@ class ComponentWrapper {
 
       // Stop dependencies in reverse order
       for (const dep of this.dependencies.reverse()) {
-        if (dep.state === 'started') {
+        if (dep.state === "started") {
           await dep.stop();
         }
       }
 
-      this.state = 'stopped';
-      this.component.state = 'stopped';
+      this.state = "stopped";
+      this.component.state = "stopped";
     } catch (error) {
-      throw new ComponentError(
-        `Failed to stop component ${this.component.name}`,
-        this.component.id,
-        error as Error
-      );
+      throw new ComponentError(`Failed to stop component ${this.component.name}`, this.component.id, error as Error);
     }
   }
 
@@ -187,12 +179,12 @@ class ComponentWrapper {
    * Destroy the component
    */
   async destroy(): Promise<void> {
-    if (this.state === 'destroyed') {
+    if (this.state === "destroyed") {
       return; // Already destroyed
     }
 
     try {
-      if (this.state === 'started') {
+      if (this.state === "started") {
         await this.stop();
       }
 
@@ -202,19 +194,15 @@ class ComponentWrapper {
 
       // Destroy dependencies in reverse order
       for (const dep of this.dependencies.reverse()) {
-        if (dep.state !== 'destroyed') {
+        if (dep.state !== "destroyed") {
           await dep.destroy();
         }
       }
 
-      this.state = 'destroyed';
-      this.component.state = 'destroyed';
+      this.state = "destroyed";
+      this.component.state = "destroyed";
     } catch (error) {
-      throw new ComponentError(
-        `Failed to destroy component ${this.component.name}`,
-        this.component.id,
-        error as Error
-      );
+      throw new ComponentError(`Failed to destroy component ${this.component.name}`, this.component.id, error as Error);
     }
   }
 }
@@ -258,7 +246,7 @@ export class ComponentFactory {
       const component = await config.factory(...args);
       component.id = component.id || this.generateComponentId();
       component.name = name;
-      component.state = 'created';
+      component.state = "created";
 
       const wrapper = new ComponentWrapper(component, config);
 
@@ -279,11 +267,7 @@ export class ComponentFactory {
 
       return component;
     } catch (error) {
-      throw new ComponentError(
-        `Failed to create component ${name}`,
-        undefined,
-        error as Error
-      );
+      throw new ComponentError(`Failed to create component ${name}`, undefined, error as Error);
     }
   }
 
@@ -349,12 +333,12 @@ export class ComponentFactory {
    */
   async initializeAll(): Promise<void> {
     const wrappers = Array.from(this.components.values());
-    
+
     // Sort by dependency order
     const sorted = this.topologicalSort(wrappers);
-    
+
     for (const wrapper of sorted) {
-      if (wrapper.state === 'created') {
+      if (wrapper.state === "created") {
         await wrapper.initialize();
       }
     }
@@ -365,12 +349,12 @@ export class ComponentFactory {
    */
   async startAll(): Promise<void> {
     const wrappers = Array.from(this.components.values());
-    
+
     // Sort by dependency order
     const sorted = this.topologicalSort(wrappers);
-    
+
     for (const wrapper of sorted) {
-      if (wrapper.state === 'initialized') {
+      if (wrapper.state === "initialized") {
         await wrapper.start();
       }
     }
@@ -381,12 +365,12 @@ export class ComponentFactory {
    */
   async stopAll(): Promise<void> {
     const wrappers = Array.from(this.components.values());
-    
+
     // Sort by reverse dependency order
     const sorted = this.topologicalSort(wrappers).reverse();
-    
+
     for (const wrapper of sorted) {
-      if (wrapper.state === 'started') {
+      if (wrapper.state === "started") {
         await wrapper.stop();
       }
     }
@@ -397,12 +381,12 @@ export class ComponentFactory {
    */
   async destroyAll(): Promise<void> {
     const wrappers = Array.from(this.components.values());
-    
+
     // Sort by reverse dependency order
     const sorted = this.topologicalSort(wrappers).reverse();
-    
+
     for (const wrapper of sorted) {
-      if (wrapper.state !== 'destroyed') {
+      if (wrapper.state !== "destroyed") {
         await wrapper.destroy();
       }
     }
@@ -421,7 +405,7 @@ export class ComponentFactory {
    * Get all active components
    */
   getActiveComponents(): Component[] {
-    return Array.from(this.components.values()).map(w => w.component);
+    return Array.from(this.components.values()).map((w) => w.component);
   }
 
   /**

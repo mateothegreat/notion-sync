@@ -1,15 +1,4 @@
-// Export optimization components
-export {
-  createOptimizedExportCLI,
-  ETACalculator,
-  NotionApiStreamer,
-  OptimizedNotionExportCLI,
-  StreamingExportManager
-} from "../../dump/bad";
-
-export type { ExportItem, OptimizedExportConfig, StreamingExportConfig } from "../../dump/bad";
-
-// Export individual utility modules (but not the ones already exported from ./export)
+// Export individual utility modules
 export {
   BoundedQueue,
   StreamProcessor as StreamingProcessor, // Rename to avoid conflict
@@ -35,3 +24,7 @@ export { collectPaginatedAPI, iteratePaginatedAPI, retry as retryOperation, smar
 export type { OperationEventEmitter, RetryContext } from "./operations";
 
 export * from "./export/util";
+
+export { ETACalculator } from "./export/eta-calculator";
+
+export { NotionStreamingExporter, StreamingExportManager } from "./export/manager";

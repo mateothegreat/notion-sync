@@ -1,74 +1,75 @@
-import { Args, Command, Flags } from '@oclif/core';
-import { NotionSyncApp } from '../application/notion-sync-app';
-import { ExportCommandFactory } from '../application/commands/export-commands';
-import { ExportConfiguration, ExportFormat, ApplicationConfig } from '../shared/types';
-import { promises as fs } from 'fs';
-import path from 'path';
-import chalk from 'chalk';
+import { Event, Message } from "$lib/control-plane";
+import { Args, Command, Flags } from "@oclif/core";
+import chalk from "chalk";
+import { promises as fs } from "fs";
+import path from "path";
+import { ExportCommandFactory } from "../application/commands/export-commands";
+import { NotionSyncApp } from "../application/notion-sync-app";
+import { ApplicationConfig, DomainEvent, ExportConfiguration, ExportFormat } from "../shared/types";
 
 export default class ExportNew extends Command {
   static override args = {
     output: Args.string({
-      description: 'Output directory for exported files',
-      required: true,
-    }),
+      description: "Output directory for exported files",
+      required: true
+    })
   };
 
-  static override description = 'Export Notion content using the new event-driven architecture';
+  static override description = "Export Notion content using the new event-driven architecture";
 
   static override examples = [
-    '<%= config.bin %> <%= command.id %> ./exports',
-    '<%= config.bin %> <%= command.id %> ./exports --databases db1,db2',
-    '<%= config.bin %> <%= command.id %> ./exports --pages page1,page2',
-    '<%= config.bin %> <%= command.id %> ./exports --format json',
+    "<%= config.bin %> <%= command.id %> ./exports",
+    "<%= config.bin %> <%= command.id %> ./exports --databases db1,db2",
+    "<%= config.bin %> <%= command.id %> ./exports --pages page1,page2",
+    "<%= config.bin %> <%= command.id %> ./exports --format json"
   ];
 
   static override flags = {
     databases: Flags.string({
-      char: 'd',
-      description: 'Comma-separated list of database IDs to export',
-      multiple: false,
+      char: "d",
+      description: "Comma-separated list of database IDs to export",
+      multiple: false
     }),
     pages: Flags.string({
-      char: 'p',
-      description: 'Comma-separated list of page IDs to export',
-      multiple: false,
+      char: "p",
+      description: "Comma-separated list of page IDs to export",
+      multiple: false
     }),
     format: Flags.string({
-      char: 'f',
-      description: 'Export format',
-      options: ['json', 'markdown', 'html', 'csv'],
-      default: 'json',
+      char: "f",
+      description: "Export format",
+      options: ["json", "markdown", "html", "csv"],
+      default: "json"
     }),
-    'include-blocks': Flags.boolean({
-      description: 'Include block content in export',
-      default: true,
+    "include-blocks": Flags.boolean({
+      description: "Include block content in export",
+      default: true
     }),
-    'include-comments': Flags.boolean({
-      description: 'Include comments in export',
-      default: false,
+    "include-comments": Flags.boolean({
+      description: "Include comments in export",
+      default: false
     }),
-    'include-properties': Flags.boolean({
-      description: 'Include all properties in export',
-      default: true,
+    "include-properties": Flags.boolean({
+      description: "Include all properties in export",
+      default: true
     }),
     resume: Flags.boolean({
-      description: 'Resume a previous export if checkpoint exists',
-      default: false,
+      description: "Resume a previous export if checkpoint exists",
+      default: false
     }),
-    'max-concurrency': Flags.integer({
-      description: 'Maximum number of concurrent requests',
-      default: 10,
+    "max-concurrency": Flags.integer({
+      description: "Maximum number of concurrent requests",
+      default: 10
     }),
-    'chunk-size': Flags.integer({
-      description: 'Number of items to process in each chunk',
-      default: 100,
+    "chunk-size": Flags.integer({
+      description: "Number of items to process in each chunk",
+      default: 100
     }),
     verbose: Flags.boolean({
-      char: 'v',
-      description: 'Enable verbose logging',
-      default: false,
-    }),
+      char: "v",
+      description: "Enable verbose logging",
+      default: false
+    })
   };
 
   private app?: NotionSyncApp;
@@ -80,42 +81,42 @@ export default class ExportNew extends Command {
       // Validate API key
       const apiKey = process.env.NOTION_API_KEY;
       if (!apiKey) {
-        this.error('NOTION_API_KEY environment variable is required');
+        this.error("NOTION_API_KEY environment variable is required");
       }
 
       // Parse databases and pages
-      const databases = flags.databases ? flags.databases.split(',').map(id => id.trim()) : [];
-      const pages = flags.pages ? flags.pages.split(',').map(id => id.trim()) : [];
+      const databases = flags.databases ? flags.databases.split(",").map((id) => id.trim()) : [];
+      const pages = flags.pages ? flags.pages.split(",").map((id) => id.trim()) : [];
 
       if (databases.length === 0 && pages.length === 0) {
-        this.error('At least one database or page must be specified');
+        this.error("At least one database or page must be specified");
       }
 
       // Create output directory
       const outputPath = path.resolve(args.output);
       await fs.mkdir(outputPath, { recursive: true });
 
-      this.log(chalk.blue('🚀 Notion Sync - Event-Driven Architecture'));
-      this.log(chalk.gray('━'.repeat(50)));
+      this.log(chalk.blue("🚀 Notion Sync - Event-Driven Architecture"));
+      this.log(chalk.gray("━".repeat(50)));
       this.log(`📁 Output: ${chalk.yellow(outputPath)}`);
-      this.log(`🔄 Max Concurrency: ${chalk.yellow(flags['max-concurrency'])}`);
+      this.log(`🔄 Max Concurrency: ${chalk.yellow(flags["max-concurrency"])}`);
       this.log(`📦 Format: ${chalk.yellow(flags.format)}`);
-      this.log(chalk.gray('━'.repeat(50)));
+      this.log(chalk.gray("━".repeat(50)));
 
       // Create application configuration
       const appConfig: ApplicationConfig = {
         notion: {
           apiKey,
-          apiVersion: '2022-06-28',
-          baseUrl: 'https://api.notion.com',
+          apiVersion: "2022-06-28",
+          baseUrl: "https://api.notion.com",
           timeout: 30000,
           retryAttempts: 3
         },
         export: {
           defaultOutputPath: outputPath,
           defaultFormat: flags.format as ExportFormat,
-          maxConcurrency: flags['max-concurrency'],
-          chunkSize: flags['chunk-size'],
+          maxConcurrency: flags["max-concurrency"],
+          chunkSize: flags["chunk-size"],
           enableResume: flags.resume
         },
         performance: {
@@ -139,9 +140,9 @@ export default class ExportNew extends Command {
           }
         },
         logging: {
-          level: flags.verbose ? 'debug' : 'info',
-          format: 'text',
-          outputs: ['console']
+          level: flags.verbose ? "debug" : "info",
+          format: "text",
+          outputs: ["console"]
         }
       };
 
@@ -149,15 +150,15 @@ export default class ExportNew extends Command {
       const exportConfiguration: ExportConfiguration = {
         outputPath,
         format: flags.format as ExportFormat,
-        includeBlocks: flags['include-blocks'],
-        includeComments: flags['include-comments'],
-        includeProperties: flags['include-properties'],
+        includeBlocks: flags["include-blocks"],
+        includeComments: flags["include-comments"],
+        includeProperties: flags["include-properties"],
         databases,
-        pages,
+        pages
       };
 
       // Initialize application
-      this.log('🔧 Initializing application...');
+      this.log("🔧 Initializing application...");
       this.app = new NotionSyncApp(appConfig);
       await this.app.initialize();
       await this.app.start();
@@ -167,10 +168,10 @@ export default class ExportNew extends Command {
 
       // Create export command
       const createCommand = ExportCommandFactory.createExport(exportConfiguration);
-      
-      this.log('📝 Creating export...');
+
+      this.log("📝 Creating export...");
       const createResult = await this.executeCommand(createCommand);
-      
+
       if (!createResult.success) {
         throw createResult.error;
       }
@@ -180,10 +181,10 @@ export default class ExportNew extends Command {
 
       // Start export
       const startCommand = ExportCommandFactory.startExport(exportId);
-      
-      this.log('🚀 Starting export...');
+
+      this.log("🚀 Starting export...");
       const startResult = await this.executeCommand(startCommand);
-      
+
       if (!startResult.success) {
         throw startResult.error;
       }
@@ -191,14 +192,13 @@ export default class ExportNew extends Command {
       // Wait for export completion
       await this.waitForExportCompletion(exportId);
 
-      this.log(chalk.green('\n✅ Export completed successfully!'));
+      this.log(chalk.green("\n✅ Export completed successfully!"));
       this.log(`📁 Files saved to: ${chalk.yellow(outputPath)}`);
-
     } catch (error) {
       if (error instanceof Error) {
         this.error(chalk.red(`❌ Export failed: ${error.message}`));
       } else {
-        this.error(chalk.red('❌ Export failed with unknown error'));
+        this.error(chalk.red("❌ Export failed with unknown error"));
       }
     } finally {
       // Clean up
@@ -215,42 +215,44 @@ export default class ExportNew extends Command {
     let lastProgress = 0;
 
     // Monitor domain events
-    controlPlane.subscribe('domain-events', async (message) => {
+    controlPlane.subscribe("domain-events", async (message: Message<DomainEvent>) => {
       const event = message.payload;
-      
+
       switch (event.type) {
-        case 'export.progress.updated':
+        case "export.progress.updated":
           const progress = event.payload.progress;
-          
+
           // Only show progress updates every 10%
           const currentProgress = Math.floor(progress.percentage / 10) * 10;
           if (currentProgress > lastProgress) {
-            this.log(`📊 Progress: ${currentProgress}% (${progress.processed}/${progress.total}) - ${progress.currentOperation}`);
+            this.log(
+              `📊 Progress: ${currentProgress}% (${progress.processed}/${progress.total}) - ${progress.currentOperation}`
+            );
             lastProgress = currentProgress;
           }
-          
+
           if (progress.estimatedCompletion && progress.percentage > 10) {
             const eta = new Date(progress.estimatedCompletion);
             const now = new Date();
             const remainingMs = eta.getTime() - now.getTime();
             const remainingMin = Math.ceil(remainingMs / 60000);
-            
+
             if (remainingMin > 0) {
               this.log(`⏱️  ETA: ${remainingMin} minutes`);
             }
           }
           break;
 
-        case 'export.completed':
+        case "export.completed":
           const duration = event.payload.duration;
           const itemsProcessed = event.payload.itemsProcessed;
           const errors = event.payload.errors;
-          
-          this.log(chalk.green('\n🎉 Export Statistics:'));
+
+          this.log(chalk.green("\n🎉 Export Statistics:"));
           this.log(`   📦 Items processed: ${chalk.cyan(itemsProcessed)}`);
           this.log(`   ⏱️  Duration: ${chalk.cyan((duration / 1000).toFixed(1))}s`);
           this.log(`   🚀 Items/second: ${chalk.cyan((itemsProcessed / (duration / 1000)).toFixed(1))}`);
-          
+
           if (errors.length > 0) {
             this.log(`   ⚠️  Errors: ${chalk.yellow(errors.length)}`);
           } else {
@@ -258,33 +260,32 @@ export default class ExportNew extends Command {
           }
           break;
 
-        case 'export.failed':
+        case "export.failed":
           const error = event.payload.error;
           this.error(chalk.red(`❌ Export failed: ${error.message}`));
-          break;
 
-        case 'notion.rate_limit.hit':
+        case "notion.rate_limit.hit":
           const retryAfter = event.payload.retryAfter;
           this.log(chalk.yellow(`⏳ Rate limit hit. Waiting ${retryAfter} seconds...`));
           break;
 
-        case 'circuit_breaker.opened':
+        case "circuit_breaker.opened":
           const breakerName = event.payload.name;
           this.log(chalk.yellow(`🔌 Circuit breaker opened for ${breakerName}. Requests temporarily blocked.`));
           break;
 
-        case 'circuit_breaker.closed':
+        case "circuit_breaker.closed":
           const closedBreakerName = event.payload.name;
           this.log(chalk.green(`🔌 Circuit breaker closed for ${closedBreakerName}. Requests resumed.`));
           break;
 
-        case 'progress.section.started':
+        case "progress.section.started":
           const section = event.payload.section;
           const totalItems = event.payload.totalItems;
           this.log(`📂 Starting section: ${chalk.cyan(section)} (${totalItems} items)`);
           break;
 
-        case 'progress.section.completed':
+        case "progress.section.completed":
           const completedSection = event.payload.section;
           const sectionDuration = event.payload.duration;
           const sectionErrors = event.payload.errors;
@@ -297,34 +298,33 @@ export default class ExportNew extends Command {
     });
 
     // Monitor metrics
-    controlPlane.subscribe('metrics', async (message) => {
+    controlPlane.subscribe("metrics", async (message: Message<Event>) => {
       const metric = message.payload;
-      
-      if (metric.type === 'message_failed') {
-        this.log(chalk.red(`❌ Message failed: ${metric.messageType} - ${metric.error}`));
+      if (metric.type === "message_failed") {
+        this.log(chalk.red(`❌ Message failed: ${metric.type} - ${metric.source} - ${JSON.stringify(metric.payload)}`));
       }
     });
   }
 
-  private async executeCommand(command: any): Promise<any> {
+  private async executeCommand(command: Command): Promise<any> {
     if (!this.app) {
-      throw new Error('Application not initialized');
+      throw new Error("application not initialized");
     }
 
     const controlPlane = this.app.getControlPlane();
-    
+
     // Publish command
-    await controlPlane.publish('commands', command);
+    await controlPlane.publish("commands", command);
 
     // Wait for result
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        reject(new Error('Command timeout'));
+        reject(new Error("Command timeout"));
       }, 30000); // 30 second timeout
 
-      controlPlane.subscribe('command-results', async (message) => {
+      controlPlane.subscribe("command-results", async (message: Message) => {
         const result = message.payload;
-        
+
         if (result.commandId === command.id) {
           clearTimeout(timeout);
           resolve(result.result);
@@ -335,29 +335,31 @@ export default class ExportNew extends Command {
 
   private async waitForExportCompletion(exportId: string): Promise<void> {
     if (!this.app) {
-      throw new Error('Application not initialized');
+      throw new Error("Application not initialized");
     }
 
     const controlPlane = this.app.getControlPlane();
-    
+
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        reject(new Error('Export timeout (1 hour)'));
+        reject(new Error("Export timeout (1 hour)"));
       }, 3600000); // 1 hour timeout
 
-      controlPlane.subscribe('domain-events', async (message) => {
+      controlPlane.subscribe("domain-events", async (message) => {
         const event = message.payload;
-        
+
         if (event.aggregateId === exportId) {
           switch (event.type) {
-            case 'export.completed':
+            case "export.completed":
               clearTimeout(timeout);
               resolve();
               break;
-            case 'export.failed':
-            case 'export.cancelled':
+            case "export.failed":
+            case "export.cancelled":
               clearTimeout(timeout);
-              reject(new Error(`Export ${event.type.split('.')[1]}: ${event.payload.error?.message || event.payload.reason}`));
+              reject(
+                new Error(`Export ${event.type.split(".")[1]}: ${event.payload.error?.message || event.payload.reason}`)
+              );
               break;
           }
         }

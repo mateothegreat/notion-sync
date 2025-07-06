@@ -1,6 +1,6 @@
 /**
  * Shared Types
- * 
+ *
  * Core types used throughout the application
  */
 
@@ -97,18 +97,18 @@ export interface ExportFilters {
 }
 
 export enum ExportFormat {
-  JSON = 'json',
-  MARKDOWN = 'markdown',
-  HTML = 'html',
-  CSV = 'csv'
+  JSON = "json",
+  MARKDOWN = "markdown",
+  HTML = "html",
+  CSV = "csv"
 }
 
 export enum ExportStatus {
-  PENDING = 'pending',
-  RUNNING = 'running',
-  COMPLETED = 'completed',
-  FAILED = 'failed',
-  CANCELLED = 'cancelled'
+  PENDING = "pending",
+  RUNNING = "running",
+  COMPLETED = "completed",
+  FAILED = "failed",
+  CANCELLED = "cancelled"
 }
 
 // Notion types
@@ -122,16 +122,16 @@ export interface NotionObject {
 }
 
 export enum NotionObjectType {
-  PAGE = 'page',
-  DATABASE = 'database',
-  BLOCK = 'block',
-  USER = 'user',
-  COMMENT = 'comment'
+  PAGE = "page",
+  DATABASE = "database",
+  BLOCK = "block",
+  USER = "user",
+  COMMENT = "comment"
 }
 
 export interface NotionUser {
   id: string;
-  type: 'person' | 'bot';
+  type: "person" | "bot";
   name?: string;
   avatarUrl?: string;
   email?: string;
@@ -165,7 +165,7 @@ export interface NotionBlock extends NotionObject {
 }
 
 export interface NotionParent {
-  type: 'database_id' | 'page_id' | 'workspace';
+  type: "database_id" | "page_id" | "workspace";
   database_id?: string;
   page_id?: string;
 }
@@ -195,9 +195,9 @@ export interface ConcurrencyLimits {
 
 // Circuit breaker
 export enum CircuitBreakerState {
-  CLOSED = 'closed',
-  OPEN = 'open',
-  HALF_OPEN = 'half_open'
+  CLOSED = "closed",
+  OPEN = "open",
+  HALF_OPEN = "half_open"
 }
 
 export interface CircuitBreakerStats {
@@ -247,8 +247,8 @@ export interface PerformanceConfig {
 }
 
 export interface LoggingConfig {
-  level: 'debug' | 'info' | 'warn' | 'error';
-  format: 'json' | 'text';
-  outputs: ('console' | 'file')[];
+  level: "debug" | "info" | "warn" | "error";
+  format: "json" | "text";
+  outputs: ("console" | "file")[];
   filePath?: string;
 }

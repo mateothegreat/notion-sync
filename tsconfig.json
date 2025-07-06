@@ -9,7 +9,9 @@
     "noEmit": false,
     "strict": true,
     "strictNullChecks": false,
-    "target": "esnext",
+    "target": "ES2022",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
     "paths": {
       "$lib": ["./src/lib"],
       "$lib/*": ["./src/lib/*"]

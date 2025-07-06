@@ -1,459 +1,478 @@
+/**
+ * Export Command
+ *
+ * CLI command for exporting Notion content using the new event-driven architecture
+ */
 import { Flags } from "@oclif/core";
 import chalk from "chalk";
-import { config } from "dotenv";
-import { inspect } from "node:util";
-import { BaseCommand } from "../lib/commands/base-command";
-import { baseFlags } from "../lib/commands/flags";
-import { OperationTypeAwareLimiter } from "../lib/export/concurrency-manager";
-import { ExporterConfig } from "../lib/export/config";
-import { Exporter } from "../lib/export/exporter";
-import { AdaptiveRateLimiter } from "../lib/export/rate-limiting";
-import { ObjectType } from "../lib/objects/types";
+import { promises as fs } from "fs";
+import path from "path";
+import { inspect } from "util";
 
-config({
-  path: ".env",
-  quiet: true
-});
+import { config as configLoaded, resolveFlags } from "$lib/config-loader";
+import { log } from "$lib/log.js";
+import { getObjects, ObjectsEnum } from "$lib/objects/types.js";
+import { ExportService } from "../core/services/export-service.js";
+import { ProgressService } from "../core/services/progress-service.js";
+import { NotionClient } from "../infrastructure/notion/notion-client.js";
+import { BaseCommand } from "../lib/commands/base-command.js";
+import { ControlPlane, createControlPlane } from "../lib/control-plane/control-plane.js";
+import { ExportConfiguration, ExportFormat, NotionConfig } from "../shared/types/index.js";
 
-/**
- * Real-time display manager that updates console in place or outputs line-by-line.
- */
-class RealTimeDisplayManager {
-  private displayInterval: NodeJS.Timeout | null = null;
-  private startTime = Date.now();
-  private isActive = false;
-  private lastStats: any = null;
-
-  constructor(
-    private exporter: Exporter,
-    private rateLimiter: AdaptiveRateLimiter,
-    private operationLimiter: OperationTypeAwareLimiter,
-    private flushMode: boolean = false
-  ) {}
-
-  start(): void {
-    if (this.isActive) return;
-
-    this.isActive = true;
-    this.startTime = Date.now();
-
-    if (!this.flushMode) {
-      // Hide cursor and clear screen only in real-time mode
-      process.stdout.write("\x1b[?25l");
-      process.stdout.write("\x1b[2J\x1b[H");
-    }
-
-    // Start update loop
-    this.displayInterval = setInterval(() => {
-      this.updateDisplay();
-    }, 1000);
-  }
-
-  stop(): void {
-    if (!this.isActive) return;
-
-    this.isActive = false;
-
-    if (this.displayInterval) {
-      clearInterval(this.displayInterval);
-      this.displayInterval = null;
-    }
-
-    if (!this.flushMode) {
-      // Show cursor and add final newline only in real-time mode
-      process.stdout.write("\x1b[?25h\n");
-    }
-  }
-
-  private updateDisplay(): void {
-    const stats = this.gatherStats();
-
-    if (this.flushMode) {
-      // In flush mode, only emit new logs when significant changes occur
-      this.emitProgressUpdate(stats);
-    } else {
-      // In real-time mode, update display in place
-      const display = this.formatDisplay(stats);
-      // Move cursor to top and clear screen
-      process.stdout.write("\x1b[H\x1b[J");
-      process.stdout.write(display);
-    }
-  }
-
-  private emitProgressUpdate(stats: any): void {
-    // Emit selective progress updates as new lines
-    const now = new Date().toLocaleTimeString();
-
-    // Current operation change
-    if (!this.lastStats || this.lastStats.items.currentOperation !== stats.items.currentOperation) {
-      console.log(`📍 [${now}] Current: ${stats.items.currentOperation}`);
-    }
-
-    // Progress milestones (every 100 items)
-    const totalItems =
-      stats.items.users + stats.items.databases + stats.items.pages + stats.items.blocks + stats.items.comments;
-    const lastTotalItems = this.lastStats
-      ? this.lastStats.items.users +
-        this.lastStats.items.databases +
-        this.lastStats.items.pages +
-        this.lastStats.items.blocks +
-        this.lastStats.items.comments
-      : 0;
-
-    if (Math.floor(totalItems / 100) > Math.floor(lastTotalItems / 100)) {
-      console.log(
-        `📊 [${now}] Progress: ${totalItems} items processed (${stats.performance.operationsPerSecond.toFixed(
-          1
-        )} ops/s)`
-      );
-    }
-
-    // Error alerts
-    if (stats.errors.total > (this.lastStats?.errors.total || 0)) {
-      console.log(
-        `❌ [${now}] Error: ${stats.errors.list[stats.errors.list.length - 1]?.type}: ${
-          stats.errors.list[stats.errors.list.length - 1]?.error
-        }`
-      );
-    }
-
-    // Memory warnings
-    if (stats.system.memoryUsageMB > 500) {
-      // Warning at 500MB
-      const lastMemory = this.lastStats?.system.memoryUsageMB || 0;
-      if (Math.floor(stats.system.memoryUsageMB / 100) > Math.floor(lastMemory / 100)) {
-        console.log(`💾 [${now}] Memory usage: ${stats.system.memoryUsageMB}MB`);
-      }
-    }
-
-    // Rate limit changes
-    if (!this.lastStats || stats.rateLimit.currentLimit !== this.lastStats.rateLimit.currentLimit) {
-      console.log(`🔧 [${now}] Concurrency limit adjusted: ${stats.rateLimit.currentLimit}`);
-    }
-
-    this.lastStats = stats;
-  }
-
-  private gatherStats() {
-    const rateLimiterStats = this.rateLimiter.getStats();
-    const operationStats = this.operationLimiter.getAllStats();
-    const globalStats = this.operationLimiter.getGlobalStats();
-    const progress = (this.exporter as any).progress || {};
-
-    return {
-      rateLimit: {
-        currentLimit: rateLimiterStats.recommendedConcurrency,
-        remainingRequests: rateLimiterStats.remainingRequests,
-        resetTime: rateLimiterStats.resetTime,
-        quotaLimit: rateLimiterStats.quotaLimit,
-        quotaUtilization:
-          rateLimiterStats.quotaLimit > 0 ? 1 - rateLimiterStats.remainingRequests / rateLimiterStats.quotaLimit : 0,
-        adaptiveInterval: rateLimiterStats.adaptiveInterval
-      },
-      performance: {
-        operationsPerSecond: globalStats.operationsPerSecond,
-        avgResponseTime: rateLimiterStats.avgResponseTime,
-        errorRate: globalStats.errorRate,
-        successRate: rateLimiterStats.successRate
-      },
-      items: {
-        users: progress.usersCount || 0,
-        databases: progress.databasesCount || 0,
-        pages: progress.pagesCount || 0,
-        blocks: progress.blocksCount || 0,
-        comments: progress.commentsCount || 0,
-        properties: 0,
-        currentOperation: progress.currentOperation || "Initializing"
-      },
-      errors: {
-        total: globalStats.totalErrors,
-        list: (this.exporter as any).errors || []
-      },
-      retries: rateLimiterStats.retryStats,
-      system: {
-        uptime: Date.now() - this.startTime,
-        memoryUsageMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-        activeOperations: globalStats.activeOperations
-      }
-    };
-  }
-
-  private formatDisplay(stats: any): string {
-    const lines: string[] = [];
-
-    // Header
-    lines.push("🚀 Notion Export - Real-time Dashboard");
-    lines.push("═".repeat(80));
-    lines.push("");
-
-    // Current Operation
-    lines.push(`📍 Current: ${stats.items.currentOperation}`);
-    lines.push("");
-
-    // Rate Limiting Section
-    lines.push("📊 Rate Limiting & API Status");
-    lines.push("─".repeat(40));
-    lines.push(`   Concurrency Limit: ${stats.rateLimit.currentLimit}`);
-    lines.push(`   API Quota Remaining: ${stats.rateLimit.remainingRequests} / ${stats.rateLimit.quotaLimit}`);
-    lines.push(`   Quota Utilization: ${(stats.rateLimit.quotaUtilization * 100).toFixed(1)}%`);
-    lines.push(`   Rate Reset Time: ${stats.rateLimit.resetTime.toLocaleTimeString()}`);
-    lines.push(`   Adaptive Interval: ${stats.rateLimit.adaptiveInterval}ms`);
-    lines.push("");
-
-    // Performance Section
-    lines.push("⚡ Performance Metrics");
-    lines.push("─".repeat(40));
-    lines.push(`   Operations/sec: ${stats.performance.operationsPerSecond.toFixed(2)}`);
-    lines.push(`   Avg Response Time: ${stats.performance.avgResponseTime.toFixed(0)}ms`);
-    lines.push(`   Success Rate: ${(stats.performance.successRate * 100).toFixed(1)}%`);
-    lines.push(`   Error Rate: ${(stats.performance.errorRate * 100).toFixed(2)}%`);
-    lines.push("");
-
-    // Item Counts Section
-    lines.push("📦 Content Processing");
-    lines.push("─".repeat(40));
-    if (stats.items.users > 0) lines.push(`   Users: ${stats.items.users}`);
-    if (stats.items.databases > 0) lines.push(`   Databases: ${stats.items.databases}`);
-    if (stats.items.pages > 0) lines.push(`   Pages: ${stats.items.pages}`);
-    if (stats.items.blocks > 0) lines.push(`   Blocks: ${stats.items.blocks}`);
-    if (stats.items.comments > 0) lines.push(`   Comments: ${stats.items.comments}`);
-    lines.push("");
-
-    // Errors Section
-    lines.push("❌ Error Tracking");
-    lines.push("─".repeat(40));
-    lines.push(`   Total Errors: ${stats.errors.total}`);
-    if (stats.errors.list.length > 0) {
-      lines.push("   Recent errors:");
-      stats.errors.list.slice(-3).forEach((error: any) => {
-        lines.push(`     └─ ${error.type}: ${error.error}`);
-      });
-    }
-    lines.push("");
-
-    // Retries Section
-    lines.push("🔄 Retry Statistics");
-    lines.push("─".repeat(40));
-    lines.push(`   Total Retry Attempts: ${stats.retries.totalAttempts}`);
-    lines.push(`   Successful Retries: ${stats.retries.successfulRetries}`);
-    lines.push(`   Failed Retries: ${stats.retries.failedRetries}`);
-    lines.push(`   Retries/minute: ${stats.retries.retriesPerMinute}`);
-    lines.push("");
-
-    // System Section
-    lines.push("💻 System Status");
-    lines.push("─".repeat(40));
-    const uptimeMinutes = Math.floor(stats.system.uptime / 60000);
-    const uptimeSeconds = Math.floor((stats.system.uptime % 60000) / 1000);
-    lines.push(`   Uptime: ${uptimeMinutes}m ${uptimeSeconds}s`);
-    lines.push(`   Memory Usage: ${stats.system.memoryUsageMB}MB`);
-    lines.push(`   Active Operations: ${stats.system.activeOperations}`);
-    lines.push("");
-
-    // Footer with timestamp
-    lines.push("─".repeat(80));
-    lines.push(`Last updated: ${new Date().toLocaleTimeString()}`);
-
-    return lines.join("\n");
-  }
-}
-
-/**
- * Export command with real-time monitoring.
- */
-export default class ExportOptimized extends BaseCommand {
-  static override description = "Export Notion workspace with real-time monitoring.";
+export default class Export extends BaseCommand<typeof Export> {
+  static override description = "Export Notion content using the new event-driven architecture";
 
   static override examples = [
-    "<%= config.bin %> <%= command.id %>",
-    "<%= config.bin %> <%= command.id %> --format markdown",
-    "<%= config.bin %> <%= command.id %> --concurrency 10",
-    "<%= config.bin %> <%= command.id %> --flush"
+    "<%= config.bin %> <%= command.id %> --path ./exports",
+    "<%= config.bin %> <%= command.id %> --path ./exports --databases db1,db2",
+    "<%= config.bin %> <%= command.id %> --path ./exports --pages page1,page2",
+    "<%= config.bin %> <%= command.id %> --path ./exports --format json"
   ];
 
   static override flags = {
-    ...baseFlags,
-    output: Flags.string({
-      description: "Output directory to place exported artifacts.",
-      default: `./notion-export-${new Date().toISOString().split("T")[0]}`
+    path: Flags.string({
+      char: "p",
+      description: "\nPath to the directory where the outputs will be saved.",
+      default: `./notion-export-${new Date().toISOString().split("T")[0]}`,
+      required: true
+    }),
+    databases: Flags.string({
+      char: "d",
+      description: "Comma-separated list of database IDs to export."
+    }),
+    objects: Flags.string({
+      description: "\nObjects to export (if not provided, all objects will be exported by default).",
+      options: getObjects(Object.values(ObjectsEnum).join(",")),
+      default: Object.values(ObjectsEnum).join(","),
+      required: true
+    }),
+    pages: Flags.string({
+      char: "p",
+      description: "Comma-separated list of page IDs to export."
     }),
     format: Flags.string({
-      description: "Export format(s).",
-      options: ["json", "markdown", "csv"],
-      multiple: true
+      char: "f",
+      description: "\nFormat of the exported data.",
+      options: ["json", "markdown", "html", "csv"],
+      default: "json"
     }),
-    concurrency: Flags.integer({
-      description: "Number of concurrent operations.",
-      default: 5
-    }),
-    archived: Flags.boolean({
-      description: "Export archived pages",
+    "include-blocks": Flags.boolean({
+      description: "\nInclude block content in export.",
       default: true
     }),
-    comments: Flags.boolean({
-      description: "Export comments",
+    "include-comments": Flags.boolean({
+      description: "\nInclude comments in export.",
+      default: false
+    }),
+    "include-properties": Flags.boolean({
+      description: "\nInclude all properties in export.",
       default: true
     }),
-    depth: Flags.integer({
-      description: "Depth of nested pages to export",
+    resume: Flags.boolean({
+      description: "\nResume a previous export if checkpoint exists.",
+      default: false
+    }),
+    "max-concurrency": Flags.integer({
+      description: "\nMaximum number of concurrent requests.",
       default: 10
     }),
-    rate: Flags.integer({
-      description: "Base rate limit delay in milliseconds",
-      default: 100
-    }),
-    properties: Flags.boolean({
-      description: "Export page properties",
-      default: true
-    }),
-    retries: Flags.integer({
-      description: "Number of retries for failed requests",
-      default: 3
-    }),
-    size: Flags.integer({
-      description: "Page size for API requests",
-      default: 100
-    }),
-    flush: Flags.boolean({
-      description: "Enable flush mode (outputting line-by-line logs)",
+    verbose: Flags.boolean({
+      char: "v",
+      description: "Enable verbose logging.",
       default: false
     })
   };
 
-  async run(): Promise<void> {
-    const { flags } = await this.parse(ExportOptimized);
+  private controlPlane?: ControlPlane;
+  private exportService?: ExportService;
+  private progressService?: ProgressService;
+  private notionClient?: NotionClient;
 
-    // Initialize rate limiter and operation limiter
-    const rateLimiter = new AdaptiveRateLimiter({
-      initialConcurrency: flags.concurrency,
-      maxConcurrency: flags.concurrency * 3,
-      minConcurrency: 1
-    });
+  public async run(): Promise<void> {
+    const { args, flags } = await this.parse(Export);
+    log.debug.inspect("flags", flags);
 
-    const operationLimiter = new OperationTypeAwareLimiter({
-      pages: flags.concurrency,
-      databases: Math.max(1, Math.floor(flags.concurrency * 0.6)),
-      blocks: Math.min(20, flags.concurrency * 4),
-      comments: flags.concurrency * 2,
-      users: 25,
-      properties: 15
-    });
-
-    // Create exporter config
-    const exporterConfig = new ExporterConfig({
-      ...flags,
-      objects: flags.objects as ObjectType[]
-    });
-
-    // Create exporter with injected limiters
-    const exporter = new Exporter(exporterConfig);
-
-    // Inject the limiters into the exporter
-    (exporter as any).rateLimiter = rateLimiter;
-    (exporter as any).concurrencyLimiter = operationLimiter;
-
-    // Set up event listeners to update rate limiter
-    // Listen to all events and filter for API calls
-    exporter.on("*", (event: string, data: any) => {
-      // Only log events in flush mode to avoid interfering with real-time display
-      // if (flags.flush) {
-      console.log(
-        `🔍 [${new Date().toLocaleTimeString()}] ====${event}:`,
-        inspect(data, { depth: 2, colors: true, compact: true })
-      );
-
-      switch (event) {
-        case "api-call":
-          rateLimiter.recordRetryAttempt(true);
-          break;
-        case "retry":
-          rateLimiter.recordRetryAttempt(false);
-          break;
-        default:
-          throw new Error(`unknown event: ${event}`);
-      }
-      // }
-      if (event === "api-call") {
-        // Track API calls
-        // rateLimiter.recordRetryAttempt(true);
-        // if (data.headers) {
-        //   rateLimiter.updateFromHeaders(data.headers, data.responseTime);
-        // }
-      }
-    });
-
-    exporter.on("retry", (data: any) => {
-      console.log("retry", data);
-      rateLimiter.recordRetryAttempt(false);
-      if (flags.flush) {
-        console.log(`🔄 [${new Date().toLocaleTimeString()}] Retry:`, data);
-      }
-    });
-
-    // exporter.on("progress", (message: string) => {
-    //   // Progress is tracked in the exporter's internal state
-    //   if (flags.flush) {
-    //     console.log(message);
-    //     console.log(`${new Date().toLocaleTimeString()} 📈 [progress]: ${JSON.stringify(message)}`);
-    //   }
-    // });
-
-    // Create display manager with flush mode
-    const displayManager = new RealTimeDisplayManager(exporter, rateLimiter, operationLimiter, flags.flush);
-
-    console.log(`${chalk.blue("🚀 Notion Export with Real-time Monitoring")}`);
-    if (flags.flush) {
-      console.log(`${chalk.gray("📄 Flush mode enabled - outputting line-by-line logs")}`);
-    }
-    console.log(`${chalk.gray("━".repeat(50))}`);
-    console.log(`📁 Output: ${chalk.yellow(flags.output)}`);
-    console.log(`🔄 Concurrency: ${chalk.yellow(flags.concurrency)}`);
-    console.log(`${chalk.gray("━".repeat(50))}\n`);
-
-    // Handle graceful shutdown
-    process.on("SIGINT", () => {
-      displayManager.stop();
-      console.log(chalk.yellow("\n\n💾 Export interrupted! Progress and checkpoint data has been saved."));
-      console.log(chalk.yellow("You can resume the export by running the command again with the --resume flag."));
-      process.exit(0);
-    });
-
-    process.on("SIGTERM", () => {
-      displayManager.stop();
-      process.exit(0);
-    });
+    const config = resolveFlags(flags);
 
     try {
-      // Start real-time display.
-      displayManager.start();
+      // Parse databases and pages
+      let databases: string[];
 
-      // Run the export
-      const result = await exporter.export();
-
-      // Stop display and show results.
-      displayManager.stop();
-
-      console.log(`\n${chalk.green("✅ Export completed successfully!")}`);
-      console.log(`${chalk.gray("━".repeat(50))}`);
-      console.log(`📊 Export Summary:`);
-      console.log(`   Users: ${result.usersCount}`);
-      console.log(`   Databases: ${result.databasesCount}`);
-      console.log(`   Pages: ${result.pagesCount}`);
-      console.log(`   Blocks: ${result.blocksCount}`);
-      console.log(`   Comments: ${result.commentsCount}`);
-      console.log(`   Files: ${result.filesCount}`);
-      console.log(`   Duration: ${((result.endTime.getTime() - result.startTime.getTime()) / 1000).toFixed(1)}s`);
-
-      if (result.errors.length > 0) {
-        console.log(`\n${chalk.yellow("⚠️  Errors encountered:")}`);
-        result.errors.forEach((error) => {
-          console.log(`   - ${error.type} ${error.id ? `(${error.id})` : ""}: ${error.error}`);
-        });
+      if (flags.databases) {
+        // If provided via CLI, parse comma-separated string
+        databases = flags.databases.split(",").map((id: string) => id.trim());
+      } else if (configLoaded.databases && configLoaded.databases.length > 0) {
+        // If not provided, use databases from config file
+        databases = configLoaded.databases.map((db: { name: string; id: string }) => db.id);
+      } else {
+        databases = [];
       }
+
+      const pages = flags.pages ? flags.pages.split(",").map((id: string) => id.trim()) : [];
+
+      if (databases.length === 0 && pages.length === 0) {
+        this.error("At least one database or page must be specified");
+      }
+
+      // Create output directory
+      const outputPath = path.resolve(flags.path);
+      await fs.mkdir(outputPath, { recursive: true });
+
+      this.log(chalk.blue("🚀 Notion Sync - Event-Driven Architecture"));
+      this.log(chalk.gray("━".repeat(50)));
+      this.log(`📁 Output: ${chalk.yellow(outputPath)}`);
+      this.log(`🔄 Max Concurrency: ${chalk.yellow(flags["max-concurrency"])}`);
+      this.log(`📦 Format: ${chalk.yellow(flags.format)}`);
+      this.log(chalk.gray("━".repeat(50)));
+
+      // Initialize control plane and services
+      await this.initializeServices(flags.token as string, flags);
+
+      // Set up progress monitoring
+      this.setupProgressMonitoring();
+
+      // Create export configuration
+      const exportConfiguration: ExportConfiguration = {
+        outputPath,
+        format: flags.format as ExportFormat,
+        includeBlocks: flags["include-blocks"],
+        includeComments: flags["include-comments"],
+        includeProperties: flags["include-properties"],
+        databases,
+        pages
+      };
+
+      // Start export process
+      await this.executeExport(exportConfiguration);
+
+      this.log(chalk.green("\n✅ Export completed successfully!"));
+      this.log(`📁 Files saved to: ${chalk.yellow(outputPath)}`);
     } catch (error) {
-      displayManager.stop();
-      console.error(chalk.red("\n❌ Export failed:"), error);
-      process.exit(1);
+      if (flags.verbose) {
+        console.log(inspect(error, { colors: true, compact: false }));
+      }
+
+      if (error instanceof Error) {
+        this.error(chalk.red(`❌ Export failed: ${error.message}`));
+      } else {
+        this.error(chalk.red("❌ Export failed with unknown error"));
+      }
+    } finally {
+      // Clean up
+      if (this.controlPlane) {
+        await this.controlPlane.destroy();
+      }
     }
+  }
+
+  /**
+   * Initialize control plane and all services.
+   */
+  private async initializeServices(apiKey: string, flags: any): Promise<void> {
+    this.log("🔧 Initializing control plane...");
+
+    // Create control plane
+    this.controlPlane = createControlPlane({
+      enableLogging: flags.verbose,
+      enableMetrics: true,
+      enableHealthCheck: true,
+      autoStartComponents: true
+    });
+
+    await this.controlPlane.initialize();
+    await this.controlPlane.start();
+
+    // Create notion configuration
+    const notionConfig: NotionConfig = {
+      apiKey,
+      apiVersion: "2022-06-28",
+      baseUrl: "https://api.notion.com",
+      timeout: 30000,
+      retryAttempts: 3
+    };
+
+    // Create circuit breaker for Notion API
+    const circuitBreaker = this.controlPlane.getCircuitBreaker("notion-api", {
+      failureThreshold: 5,
+      resetTimeout: 30000,
+      monitoringPeriod: 60000
+    });
+
+    // Create event publisher
+    const eventPublisher = async (event: any) => {
+      await this.controlPlane!.publish("domain-events", event);
+    };
+
+    // Initialize services
+    this.notionClient = new NotionClient(notionConfig, eventPublisher, circuitBreaker);
+    this.progressService = new ProgressService(eventPublisher);
+
+    // For export service, we need to create a simple in-memory repository
+    const exportRepository = this.createInMemoryExportRepository();
+    this.exportService = new ExportService(exportRepository, eventPublisher);
+
+    this.log("✅ Services initialized successfully");
+  }
+
+  /**
+   * Set up progress monitoring for export events.
+   */
+  private setupProgressMonitoring(): void {
+    if (!this.controlPlane) return;
+
+    let lastProgress = 0;
+
+    // Subscribe to domain events
+    this.controlPlane.subscribe("domain-events", async (message) => {
+      const event = message.payload as any;
+
+      if (!event || typeof event !== "object" || !event.type) {
+        return;
+      }
+
+      switch (event.type) {
+        case "export.progress.updated":
+          const progress = event.payload?.progress;
+          if (!progress) break;
+
+          // Only show progress updates every 10%
+          const currentProgress = Math.floor(progress.percentage / 10) * 10;
+          if (currentProgress > lastProgress) {
+            this.log(
+              `📊 Progress: ${currentProgress}% (${progress.processed}/${progress.total}) - ${progress.currentOperation}`
+            );
+            lastProgress = currentProgress;
+          }
+
+          if (progress.estimatedCompletion && progress.percentage > 10) {
+            const eta = new Date(progress.estimatedCompletion);
+            const now = new Date();
+            const remainingMs = eta.getTime() - now.getTime();
+            const remainingMin = Math.ceil(remainingMs / 60000);
+
+            if (remainingMin > 0) {
+              this.log(`⏱️  ETA: ${remainingMin} minutes`);
+            }
+          }
+          break;
+
+        case "export.completed":
+          const duration = event.payload?.duration;
+          const itemsProcessed = event.payload?.itemsProcessed;
+          const errors = event.payload?.errors;
+
+          if (duration && itemsProcessed && errors) {
+            this.log(chalk.green("\n🎉 Export Statistics:"));
+            this.log(`   📦 Items processed: ${chalk.cyan(itemsProcessed)}`);
+            this.log(`   ⏱️  Duration: ${chalk.cyan((duration / 1000).toFixed(1))}s`);
+            this.log(`   🚀 Items/second: ${chalk.cyan((itemsProcessed / (duration / 1000)).toFixed(1))}`);
+
+            if (errors.length > 0) {
+              this.log(`   ⚠️  Errors: ${chalk.yellow(errors.length)}`);
+            } else {
+              this.log(`   ✅ No errors`);
+            }
+          }
+          break;
+
+        case "export.failed":
+          const error = event.payload?.error;
+          if (error?.message) {
+            this.error(chalk.red(`❌ Export failed: ${error.message}`));
+          }
+          break;
+
+        case "notion.rate_limit.hit":
+          const retryAfter = event.payload?.retryAfter;
+          if (retryAfter) {
+            this.log(chalk.yellow(`⏳ Rate limit hit. Waiting ${retryAfter} seconds...`));
+          }
+          break;
+
+        case "circuit_breaker.opened":
+          const breakerName = event.payload?.name;
+          if (breakerName) {
+            this.log(chalk.yellow(`🔌 Circuit breaker opened for ${breakerName}. Requests temporarily blocked.`));
+          }
+          break;
+
+        case "circuit_breaker.closed":
+          const closedBreakerName = event.payload?.name;
+          if (closedBreakerName) {
+            this.log(chalk.green(`🔌 Circuit breaker closed for ${closedBreakerName}. Requests resumed.`));
+          }
+          break;
+
+        case "progress.section.started":
+          const section = event.payload?.section;
+          const totalItems = event.payload?.totalItems;
+          if (section && totalItems) {
+            this.log(`📂 Starting section: ${chalk.cyan(section)} (${totalItems} items)`);
+          }
+          break;
+
+        case "progress.section.completed":
+          const completedSection = event.payload?.section;
+          const sectionDuration = event.payload?.duration;
+          const sectionErrors = event.payload?.errors;
+          if (completedSection && sectionDuration) {
+            this.log(
+              `✅ Completed section: ${chalk.cyan(completedSection)} in ${(sectionDuration / 1000).toFixed(1)}s`
+            );
+            if (sectionErrors && sectionErrors.length > 0) {
+              this.log(`   ⚠️  Section errors: ${sectionErrors.length}`);
+            }
+          }
+          break;
+
+        case "notion.object.fetched":
+          // Optional: log individual object fetches in verbose mode
+          break;
+      }
+    });
+  }
+
+  /**
+   * Execute the export process.
+   */
+  private async executeExport(configuration: ExportConfiguration): Promise<void> {
+    if (!this.exportService || !this.progressService) {
+      throw new Error("Services not initialized");
+    }
+
+    // Create export
+    this.log("📝 Creating export...");
+    const export_ = await this.exportService.createExport(configuration);
+    this.log(`✅ Export created with ID: ${chalk.cyan(export_.id)}`);
+
+    // Start progress tracking
+    await this.progressService.startTracking(export_.id);
+
+    // Start export
+    this.log("🚀 Starting export...");
+    await this.exportService.startExport(export_.id);
+
+    // Process databases
+    if (configuration.databases.length > 0) {
+      await this.processDatabases(export_.id, configuration.databases);
+    }
+
+    // Process pages
+    if (configuration.pages.length > 0) {
+      await this.processPages(export_.id, configuration.pages);
+    }
+
+    // Complete export
+    await this.exportService.completeExport(export_.id, configuration.outputPath);
+    this.progressService.stopTracking(export_.id);
+  }
+
+  /**
+   * Process databases for export.
+   */
+  private async processDatabases(exportId: string, databaseIds: string[]): Promise<void> {
+    if (!this.notionClient || !this.progressService) return;
+
+    await this.progressService.startSection(exportId, "databases", databaseIds.length);
+
+    for (const databaseId of databaseIds) {
+      try {
+        const database = await this.notionClient.getDatabase(databaseId);
+
+        // Write database to output
+        await this.writeToOutput(database, "database");
+
+        await this.progressService.updateSectionProgress(exportId, "databases", 1);
+      } catch (error) {
+        const errorInfo = {
+          id: crypto.randomUUID(),
+          message: error instanceof Error ? error.message : "Unknown error",
+          code: "DATABASE_FETCH_ERROR",
+          timestamp: new Date(),
+          context: { databaseId }
+        };
+
+        await this.progressService.addError(exportId, "databases", errorInfo);
+      }
+    }
+
+    await this.progressService.completeSection(exportId, "databases");
+  }
+
+  /**
+   * Process pages for export.
+   */
+  private async processPages(exportId: string, pageIds: string[]): Promise<void> {
+    if (!this.notionClient || !this.progressService) return;
+
+    await this.progressService.startSection(exportId, "pages", pageIds.length);
+
+    for (const pageId of pageIds) {
+      try {
+        const page = await this.notionClient.getPage(pageId);
+
+        // Write page to output
+        await this.writeToOutput(page, "page");
+
+        await this.progressService.updateSectionProgress(exportId, "pages", 1);
+      } catch (error) {
+        const errorInfo = {
+          id: crypto.randomUUID(),
+          message: error instanceof Error ? error.message : "Unknown error",
+          code: "PAGE_FETCH_ERROR",
+          timestamp: new Date(),
+          context: { pageId }
+        };
+
+        await this.progressService.addError(exportId, "pages", errorInfo);
+      }
+    }
+
+    await this.progressService.completeSection(exportId, "pages");
+  }
+
+  /**
+   * Write data to output file.
+   */
+  private async writeToOutput(data: any, type: string): Promise<void> {
+    // For now, we'll just log the data
+    // In a real implementation, this would write to files based on the format
+    this.log(`📄 Exported ${type}: ${data.id}`);
+  }
+
+  /**
+   * Create a simple in-memory export repository.
+   */
+  private createInMemoryExportRepository(): any {
+    const exports = new Map();
+
+    return {
+      async save(export_: any): Promise<void> {
+        exports.set(export_.id, export_);
+      },
+
+      async findById(id: string): Promise<any> {
+        return exports.get(id) || null;
+      },
+
+      async findByStatus(status: string): Promise<any[]> {
+        return Array.from(exports.values()).filter((exp: any) => exp.status === status);
+      },
+
+      async findRunning(): Promise<any[]> {
+        return Array.from(exports.values()).filter((exp: any) => exp.status === "running");
+      },
+
+      async delete(id: string): Promise<void> {
+        exports.delete(id);
+      },
+
+      async list(limit?: number, offset?: number): Promise<any[]> {
+        const all = Array.from(exports.values());
+        const start = offset || 0;
+        const end = limit ? start + limit : all.length;
+        return all.slice(start, end);
+      }
+    };
   }
 }

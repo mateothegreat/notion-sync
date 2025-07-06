@@ -1,0 +1,13 @@
+NOTION_TOKEN: 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
+
+flush: false
+timeout: 0
+token: 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
+output: ./exports
+concurrency: 10
+depth: 1
+retries: 3
+
+databases:
+  - name: content
+    id: 16ad7342-e571-80c4-a065-c7a1015871d3

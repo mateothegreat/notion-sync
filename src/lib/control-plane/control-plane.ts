@@ -1,30 +1,28 @@
 /**
  * Main Control Plane Implementation
- * 
+ *
  * Orchestrates all control plane components and provides the main API
  */
 
-import { Subject } from 'rxjs';
-import { MessageBus, BrokerBus, InMemoryAdapter, MessageBusAdapter } from './message-bus';
-import { StateRegistry } from './state-registry';
-import { ComponentFactory } from './component-factory';
-import { CircuitBreakerRegistry } from './circuit-breaker';
-import { MiddlewarePipeline } from './middleware';
-import { PluginRegistry, PluginContext } from './plugins';
-import { HookManager } from './hooks';
-import { 
-  Message, 
-  Command, 
-  Event, 
-  Channel, 
-  BusChannel, 
+import { Subject } from "rxjs";
+import { CircuitBreakerRegistry } from "./circuit-breaker";
+import { ComponentFactory } from "./component-factory";
+import { HookManager } from "./hooks";
+import { BrokerBus, InMemoryAdapter, MessageBus, MessageBusAdapter } from "./message-bus";
+import { MiddlewarePipeline } from "./middleware";
+import { PluginContext, PluginRegistry } from "./plugins";
+import { StateRegistry } from "./state-registry";
+import {
+  BusChannel,
+  Channel,
   Component,
   ComponentConfig,
-  Middleware,
-  Plugin,
+  HookFunction,
   HookType,
-  HookFunction
-} from './types';
+  Message,
+  Middleware,
+  Plugin
+} from "./types";
 
 /**
  * Control plane configuration
@@ -82,7 +80,7 @@ export class ControlPlane {
         await this.middlewarePipeline.execute(message);
         await next();
       } catch (error) {
-        await this.hookManager.execute('error', { error, message });
+        await this.hookManager.execute("error", { error, message });
         throw error;
       }
     });
@@ -97,25 +95,25 @@ export class ControlPlane {
     }
 
     try {
-      await this.hookManager.execute('before-message', { phase: 'initialize' });
+      await this.hookManager.execute("before-message", { phase: "initialize" });
 
       // Install built-in plugins if enabled
       if (this.config.enableLogging) {
-        const { LoggingPlugin } = await import('./plugins');
+        const { LoggingPlugin } = await import("./plugins");
         this.pluginRegistry.register(new LoggingPlugin());
-        await this.pluginRegistry.install('logging');
+        await this.pluginRegistry.install("logging");
       }
 
       if (this.config.enableMetrics) {
-        const { MetricsPlugin } = await import('./plugins');
+        const { MetricsPlugin } = await import("./plugins");
         this.pluginRegistry.register(new MetricsPlugin());
-        await this.pluginRegistry.install('metrics');
+        await this.pluginRegistry.install("metrics");
       }
 
       if (this.config.enableHealthCheck) {
-        const { HealthCheckPlugin } = await import('./plugins');
+        const { HealthCheckPlugin } = await import("./plugins");
         this.pluginRegistry.register(new HealthCheckPlugin());
-        await this.pluginRegistry.install('health-check');
+        await this.pluginRegistry.install("health-check");
       }
 
       // Initialize all components if auto-start is enabled
@@ -125,9 +123,9 @@ export class ControlPlane {
 
       this.initialized = true;
 
-      await this.hookManager.execute('after-message', { phase: 'initialize' });
+      await this.hookManager.execute("after-message", { phase: "initialize" });
     } catch (error) {
-      await this.hookManager.execute('error', { error, phase: 'initialize' });
+      await this.hookManager.execute("error", { error, phase: "initialize" });
       throw error;
     }
   }
@@ -145,7 +143,7 @@ export class ControlPlane {
     }
 
     try {
-      await this.hookManager.execute('before-message', { phase: 'start' });
+      await this.hookManager.execute("before-message", { phase: "start" });
 
       // Start all components if auto-start is enabled
       if (this.config.autoStartComponents) {
@@ -154,9 +152,9 @@ export class ControlPlane {
 
       this.started = true;
 
-      await this.hookManager.execute('after-message', { phase: 'start' });
+      await this.hookManager.execute("after-message", { phase: "start" });
     } catch (error) {
-      await this.hookManager.execute('error', { error, phase: 'start' });
+      await this.hookManager.execute("error", { error, phase: "start" });
       throw error;
     }
   }
@@ -170,7 +168,7 @@ export class ControlPlane {
     }
 
     try {
-      await this.hookManager.execute('before-message', { phase: 'stop' });
+      await this.hookManager.execute("before-message", { phase: "stop" });
 
       // Stop all components
       await this.componentFactory.stopAll();
@@ -181,9 +179,9 @@ export class ControlPlane {
 
       this.started = false;
 
-      await this.hookManager.execute('after-message', { phase: 'stop' });
+      await this.hookManager.execute("after-message", { phase: "stop" });
     } catch (error) {
-      await this.hookManager.execute('error', { error, phase: 'stop' });
+      await this.hookManager.execute("error", { error, phase: "stop" });
       throw error;
     }
   }
@@ -197,7 +195,7 @@ export class ControlPlane {
     }
 
     try {
-      await this.hookManager.execute('before-message', { phase: 'destroy' });
+      await this.hookManager.execute("before-message", { phase: "destroy" });
 
       // Destroy all components
       await this.componentFactory.destroyAll();
@@ -212,9 +210,9 @@ export class ControlPlane {
 
       this.initialized = false;
 
-      await this.hookManager.execute('after-message', { phase: 'destroy' });
+      await this.hookManager.execute("after-message", { phase: "destroy" });
     } catch (error) {
-      await this.hookManager.execute('error', { error, phase: 'destroy' });
+      await this.hookManager.execute("error", { error, phase: "destroy" });
       throw error;
     }
   }
@@ -246,13 +244,13 @@ export class ControlPlane {
    * Publish a message
    */
   async publish<T>(channel: string, payload: T, metadata?: Record<string, any>): Promise<void> {
-    await this.hookManager.execute('before-message', { channel, payload, metadata });
-    
+    await this.hookManager.execute("before-message", { channel, payload, metadata });
+
     try {
       await this.messageBus.publish(channel, payload, metadata);
-      await this.hookManager.execute('after-message', { channel, payload, metadata });
+      await this.hookManager.execute("after-message", { channel, payload, metadata });
     } catch (error) {
-      await this.hookManager.execute('error', { error, channel, payload, metadata });
+      await this.hookManager.execute("error", { error, channel, payload, metadata });
       throw error;
     }
   }
@@ -260,21 +258,18 @@ export class ControlPlane {
   /**
    * Subscribe to messages
    */
-  async subscribe<T>(
-    channel: string,
-    handler: (message: Message<T>) => void | Promise<void>
-  ): Promise<() => void> {
+  async subscribe<T>(channel: string, handler: (message: Message<T>) => void | Promise<void>): Promise<() => void> {
     const wrappedHandler = async (message: Message<T>) => {
       try {
-        await this.hookManager.execute('before-message', { message });
+        await this.hookManager.execute("before-message", { message });
         await handler(message);
-        await this.hookManager.execute('after-message', { message });
+        await this.hookManager.execute("after-message", { message });
       } catch (error) {
-        await this.hookManager.execute('error', { error, message });
+        await this.hookManager.execute("error", { error, message });
         throw error;
       }
     };
-    
+
     return this.messageBus.subscribe(channel, wrappedHandler);
   }
 
@@ -374,7 +369,11 @@ export class ControlPlane {
    * Add middleware
    */
   use(middleware: Middleware): void {
-    this.middlewarePipeline.use(middleware);
+    // Wrap the simple middleware to match EnhancedMiddleware signature
+    const enhancedMiddleware = async (message: Message, context: any, next: () => void | Promise<void>) => {
+      await middleware(message, next);
+    };
+    this.middlewarePipeline.use(enhancedMiddleware);
   }
 
   // Plugin API
@@ -465,7 +464,7 @@ export class ControlPlane {
    */
   getHealth() {
     return {
-      status: this.started ? 'healthy' : 'stopped',
+      status: this.started ? "healthy" : "stopped",
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       memory: process.memoryUsage(),

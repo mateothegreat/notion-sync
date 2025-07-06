@@ -1,11 +1,20 @@
 /**
  * Notion Objects Domain Models
- * 
+ *
  * Domain models for Notion API objects
  */
 
-import { Entity, NotionObject, NotionPage, NotionDatabase, NotionBlock, NotionUser, NotionParent, NotionProperty } from '../../shared/types';
-import { ValidationError } from '../../shared/errors';
+import {
+  Entity,
+  NotionObject,
+  NotionPage,
+  NotionDatabase,
+  NotionBlock,
+  NotionUser,
+  NotionParent,
+  NotionProperty
+} from "../../shared/types";
+import { ValidationError } from "../../shared/errors";
 
 // Base Notion Object
 export abstract class BaseNotionObject implements Entity {
@@ -27,16 +36,16 @@ export abstract class BaseNotionObject implements Entity {
     this.id = id;
     this.createdAt = createdAt || new Date();
     this.updatedAt = updatedAt || new Date();
-    
+
     this.validate();
   }
 
   protected validate(): void {
     if (!this.notionId) {
-      throw new ValidationError('Notion ID is required');
+      throw new ValidationError("Notion ID is required");
     }
     if (!this.type) {
-      throw new ValidationError('Type is required');
+      throw new ValidationError("Type is required");
     }
   }
 
@@ -60,23 +69,23 @@ export class Page extends BaseNotionObject {
     createdAt?: Date,
     updatedAt?: Date
   ) {
-    super(id, notionId, 'page', createdTime, lastEditedTime, createdBy, lastEditedBy, createdAt, updatedAt);
+    super(id, notionId, "page", createdTime, lastEditedTime, createdBy, lastEditedBy, createdAt, updatedAt);
   }
 
   protected validate(): void {
     super.validate();
     if (!this.title) {
-      throw new ValidationError('Page title is required');
+      throw new ValidationError("Page title is required");
     }
     if (!this.url) {
-      throw new ValidationError('Page URL is required');
+      throw new ValidationError("Page URL is required");
     }
   }
 
   toNotionObject(): NotionPage {
     return {
       id: this.notionId,
-      type: 'page' as any,
+      type: "page" as any,
       title: this.title,
       properties: this.properties,
       parent: this.parent,
@@ -90,11 +99,11 @@ export class Page extends BaseNotionObject {
   }
 
   hasParentDatabase(): boolean {
-    return this.parent.type === 'database_id';
+    return this.parent.type === "database_id";
   }
 
   hasParentPage(): boolean {
-    return this.parent.type === 'page_id';
+    return this.parent.type === "page_id";
   }
 
   getParentId(): string | null {
@@ -132,23 +141,23 @@ export class Database extends BaseNotionObject {
     createdAt?: Date,
     updatedAt?: Date
   ) {
-    super(id, notionId, 'database', createdTime, lastEditedTime, createdBy, lastEditedBy, createdAt, updatedAt);
+    super(id, notionId, "database", createdTime, lastEditedTime, createdBy, lastEditedBy, createdAt, updatedAt);
   }
 
   protected validate(): void {
     super.validate();
     if (!this.title) {
-      throw new ValidationError('Database title is required');
+      throw new ValidationError("Database title is required");
     }
     if (!this.url) {
-      throw new ValidationError('Database URL is required');
+      throw new ValidationError("Database URL is required");
     }
   }
 
   toNotionObject(): NotionDatabase {
     return {
       id: this.notionId,
-      type: 'database' as any,
+      type: "database" as any,
       title: this.title,
       description: this.description,
       properties: this.properties,
@@ -175,7 +184,7 @@ export class Database extends BaseNotionObject {
   }
 
   getPropertyByType(type: string): NotionProperty[] {
-    return Object.values(this.properties).filter(prop => prop.type === type);
+    return Object.values(this.properties).filter((prop) => prop.type === type);
   }
 
   isArchived(): boolean {
@@ -200,20 +209,20 @@ export class Block extends BaseNotionObject {
     createdAt?: Date,
     updatedAt?: Date
   ) {
-    super(id, notionId, 'block', createdTime, lastEditedTime, createdBy, lastEditedBy, createdAt, updatedAt);
+    super(id, notionId, "block", createdTime, lastEditedTime, createdBy, lastEditedBy, createdAt, updatedAt);
   }
 
   protected validate(): void {
     super.validate();
     if (!this.blockType) {
-      throw new ValidationError('Block type is required');
+      throw new ValidationError("Block type is required");
     }
   }
 
   toNotionObject(): NotionBlock {
     return {
       id: this.notionId,
-      type: 'block' as any,
+      type: "block" as any,
       blockType: this.blockType,
       hasChildren: this.hasChildren,
       archived: this.archived,
@@ -230,7 +239,7 @@ export class Block extends BaseNotionObject {
   }
 
   removeChild(childId: string): void {
-    const index = this.children.findIndex(child => child.id === childId);
+    const index = this.children.findIndex((child) => child.id === childId);
     if (index !== -1) {
       this.children.splice(index, 1);
     }
@@ -242,36 +251,36 @@ export class Block extends BaseNotionObject {
 
   getAllDescendants(): Block[] {
     const descendants: Block[] = [];
-    
+
     for (const child of this.children) {
       descendants.push(child);
       descendants.push(...child.getAllDescendants());
     }
-    
+
     return descendants;
   }
 
   isTextBlock(): boolean {
-    return ['paragraph', 'heading_1', 'heading_2', 'heading_3', 'bulleted_list_item', 'numbered_list_item'].includes(this.blockType);
+    return ["paragraph", "heading_1", "heading_2", "heading_3", "bulleted_list_item", "numbered_list_item"].includes(
+      this.blockType
+    );
   }
 
   isMediaBlock(): boolean {
-    return ['image', 'video', 'file', 'pdf', 'audio'].includes(this.blockType);
+    return ["image", "video", "file", "pdf", "audio"].includes(this.blockType);
   }
 
   isContainerBlock(): boolean {
-    return ['column_list', 'column', 'toggle', 'quote', 'callout'].includes(this.blockType);
+    return ["column_list", "column", "toggle", "quote", "callout"].includes(this.blockType);
   }
 
   getText(): string {
-    if (!this.isTextBlock()) return '';
-    
+    if (!this.isTextBlock()) return "";
+
     const textContent = this.content[this.blockType];
-    if (!textContent || !textContent.rich_text) return '';
-    
-    return textContent.rich_text
-      .map((text: any) => text.plain_text || '')
-      .join('');
+    if (!textContent || !textContent.rich_text) return "";
+
+    return textContent.rich_text.map((text: any) => text.plain_text || "").join("");
   }
 }
 

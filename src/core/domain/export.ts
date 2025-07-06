@@ -1,11 +1,18 @@
 /**
  * Export Domain Model
- * 
+ *
  * Core business logic for export operations
  */
 
-import { Entity, ExportConfiguration, ExportStatus, ProgressInfo, ErrorInfo } from '../../shared/types';
-import { ExportError, ValidationError } from '../../shared/errors';
+import { ExportError, ValidationError } from "../../shared/errors/index";
+import {
+  Entity,
+  ErrorInfo,
+  ExportConfiguration,
+  ExportFormat,
+  ExportStatus,
+  ProgressInfo
+} from "../../shared/types/index";
 
 export class Export implements Entity {
   public readonly id: string;
@@ -20,7 +27,7 @@ export class Export implements Entity {
       processed: 0,
       total: 0,
       percentage: 0,
-      currentOperation: 'initializing',
+      currentOperation: "initializing",
       errors: []
     },
     public outputPath?: string,
@@ -33,17 +40,17 @@ export class Export implements Entity {
     this.id = id;
     this.createdAt = createdAt || new Date();
     this.updatedAt = updatedAt || new Date();
-    
+
     this.validateConfiguration();
   }
 
   private validateConfiguration(): void {
     if (!this.configuration.outputPath) {
-      throw new ValidationError('Output path is required');
+      throw new ValidationError("Output path is required");
     }
 
     if (this.configuration.databases.length === 0 && this.configuration.pages.length === 0) {
-      throw new ValidationError('At least one database or page must be specified');
+      throw new ValidationError("At least one database or page must be specified");
     }
 
     if (!Object.values(ExportFormat).includes(this.configuration.format as any)) {
@@ -69,7 +76,9 @@ export class Export implements Entity {
     this.progress = {
       ...this.progress,
       ...progress,
-      percentage: progress.total ? (progress.processed || this.progress.processed) / progress.total * 100 : this.progress.percentage
+      percentage: progress.total
+        ? ((progress.processed || this.progress.processed) / progress.total) * 100
+        : this.progress.percentage
     };
 
     // Update ETA if we have enough data
@@ -77,7 +86,7 @@ export class Export implements Entity {
       const elapsed = Date.now() - this.startedAt.getTime();
       const rate = this.progress.processed / elapsed;
       const remaining = this.progress.total - this.progress.processed;
-      this.progress.estimatedCompletion = new Date(Date.now() + (remaining / rate));
+      this.progress.estimatedCompletion = new Date(Date.now() + remaining / rate);
     }
 
     this.updatedAt = new Date();
@@ -97,11 +106,11 @@ export class Export implements Entity {
     this.outputPath = outputPath;
     this.completedAt = new Date();
     this.updatedAt = new Date();
-    
+
     // Ensure progress shows 100%
     this.progress.processed = this.progress.total;
     this.progress.percentage = 100;
-    this.progress.currentOperation = 'completed';
+    this.progress.currentOperation = "completed";
   }
 
   fail(error: ErrorInfo): void {
@@ -113,7 +122,7 @@ export class Export implements Entity {
     this.error = error;
     this.completedAt = new Date();
     this.updatedAt = new Date();
-    this.progress.currentOperation = 'failed';
+    this.progress.currentOperation = "failed";
   }
 
   cancel(reason: string): void {
@@ -125,13 +134,13 @@ export class Export implements Entity {
     this.error = {
       id: crypto.randomUUID(),
       message: `Export cancelled: ${reason}`,
-      code: 'EXPORT_CANCELLED',
+      code: "EXPORT_CANCELLED",
       timestamp: new Date(),
       context: { reason }
     };
     this.completedAt = new Date();
     this.updatedAt = new Date();
-    this.progress.currentOperation = 'cancelled';
+    this.progress.currentOperation = "cancelled";
   }
 
   getDuration(): number | null {

@@ -1,10 +1,10 @@
 /**
  * Plugin System
- * 
+ *
  * Provides extensible plugin architecture for the control plane
  */
 
-import { Plugin } from './types';
+import { Plugin } from "./types";
 
 /**
  * Plugin context for accessing control plane features
@@ -129,10 +129,7 @@ export class PluginRegistry {
     try {
       // Check if other plugins depend on this one
       for (const [pluginName, installedPlugin] of this.plugins) {
-        if (
-          this.installedPlugins.has(pluginName) &&
-          installedPlugin.metadata?.dependencies?.includes(name)
-        ) {
+        if (this.installedPlugins.has(pluginName) && installedPlugin.metadata?.dependencies?.includes(name)) {
           throw new Error(`Cannot uninstall plugin ${name}: plugin ${pluginName} depends on it`);
         }
       }
@@ -206,10 +203,10 @@ export class PluginRegistry {
    */
   async installAll(): Promise<void> {
     const plugins = Array.from(this.plugins.keys());
-    
+
     // Sort by dependencies
     const sorted = this.topologicalSort(plugins);
-    
+
     for (const name of sorted) {
       if (!this.installedPlugins.has(name)) {
         await this.install(name);
@@ -222,10 +219,10 @@ export class PluginRegistry {
    */
   async uninstallAll(): Promise<void> {
     const plugins = Array.from(this.installedPlugins);
-    
+
     // Sort by reverse dependencies
     const sorted = this.topologicalSort(plugins).reverse();
-    
+
     for (const name of sorted) {
       await this.uninstall(name);
     }
@@ -276,13 +273,13 @@ export class PluginRegistry {
  * Built-in logging plugin
  */
 export class LoggingPlugin implements EnhancedPlugin {
-  name = 'logging';
-  version = '1.0.0';
+  name = "logging";
+  version = "1.0.0";
   metadata: PluginMetadata = {
-    name: 'logging',
-    version: '1.0.0',
-    description: 'Provides logging capabilities for the control plane',
-    author: 'Control Plane Team'
+    name: "logging",
+    version: "1.0.0",
+    description: "Provides logging capabilities for the control plane",
+    author: "Control Plane Team"
   };
 
   async install(context: PluginContext): Promise<void> {
@@ -292,14 +289,14 @@ export class LoggingPlugin implements EnhancedPlugin {
         console.log(`[${new Date().toISOString()}] Processing message: ${message.type}`);
         await next();
       };
-      
+
       context.messageBus.use(loggingMiddleware);
     }
   }
 
   async uninstall(context: PluginContext): Promise<void> {
     // Remove logging middleware (implementation depends on message bus API)
-    console.log('Logging plugin uninstalled');
+    console.log("Logging plugin uninstalled");
   }
 }
 
@@ -307,13 +304,13 @@ export class LoggingPlugin implements EnhancedPlugin {
  * Built-in metrics plugin
  */
 export class MetricsPlugin implements EnhancedPlugin {
-  name = 'metrics';
-  version = '1.0.0';
+  name = "metrics";
+  version = "1.0.0";
   metadata: PluginMetadata = {
-    name: 'metrics',
-    version: '1.0.0',
-    description: 'Provides metrics collection for the control plane',
-    author: 'Control Plane Team'
+    name: "metrics",
+    version: "1.0.0",
+    description: "Provides metrics collection for the control plane",
+    author: "Control Plane Team"
   };
 
   private metrics = new Map<string, number>();
@@ -323,7 +320,7 @@ export class MetricsPlugin implements EnhancedPlugin {
     if (context.messageBus && context.messageBus.use) {
       const metricsMiddleware = async (message: any, next: any) => {
         const startTime = Date.now();
-        
+
         try {
           await next();
           this.recordMetric(`${message.type}.success`, 1);
@@ -333,7 +330,7 @@ export class MetricsPlugin implements EnhancedPlugin {
           throw error;
         }
       };
-      
+
       context.messageBus.use(metricsMiddleware);
     }
 
@@ -357,20 +354,20 @@ export class MetricsPlugin implements EnhancedPlugin {
  * Built-in health check plugin
  */
 export class HealthCheckPlugin implements EnhancedPlugin {
-  name = 'health-check';
-  version = '1.0.0';
+  name = "health-check";
+  version = "1.0.0";
   metadata: PluginMetadata = {
-    name: 'health-check',
-    version: '1.0.0',
-    description: 'Provides health check capabilities for the control plane',
-    author: 'Control Plane Team'
+    name: "health-check",
+    version: "1.0.0",
+    description: "Provides health check capabilities for the control plane",
+    author: "Control Plane Team"
   };
 
   async install(context: PluginContext): Promise<void> {
     // Add health check endpoint
     context.healthCheck = () => {
       return {
-        status: 'healthy',
+        status: "healthy",
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         memory: process.memoryUsage(),
@@ -387,15 +384,15 @@ export class HealthCheckPlugin implements EnhancedPlugin {
     const components: Record<string, string> = {};
 
     if (context.messageBus) {
-      components.messageBus = 'healthy';
+      components.messageBus = "healthy";
     }
 
     if (context.stateRegistry) {
-      components.stateRegistry = 'healthy';
+      components.stateRegistry = "healthy";
     }
 
     if (context.componentFactory) {
-      components.componentFactory = 'healthy';
+      components.componentFactory = "healthy";
     }
 
     return components;
@@ -484,7 +481,7 @@ export class PluginBuilder {
 
   build(): EnhancedPlugin {
     if (!this.plugin.name || !this.plugin.version || !this.plugin.install) {
-      throw new Error('Plugin must have name, version, and install function');
+      throw new Error("Plugin must have name, version, and install function");
     }
 
     return this.plugin as EnhancedPlugin;

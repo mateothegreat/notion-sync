@@ -1,11 +1,11 @@
 /**
  * Hooks System
- * 
+ *
  * Provides lifecycle hooks for extensible behavior
  */
 
-import { Observable, Subject } from 'rxjs';
-import { HookType, HookFunction } from './types';
+import { Observable, Subject } from "rxjs";
+import { HookType, HookFunction } from "./types";
 
 /**
  * Hook context for passing data to hook functions
@@ -71,7 +71,7 @@ export class HookManager {
    */
   unregister(id: string): boolean {
     for (const [type, hooks] of this.hooks) {
-      const index = hooks.findIndex(h => h.id === id);
+      const index = hooks.findIndex((h) => h.id === id);
       if (index !== -1) {
         hooks.splice(index, 1);
         return true;
@@ -104,14 +104,14 @@ export class HookManager {
         }
       } catch (error) {
         console.error(`Error executing hook ${hook.id} for type ${type}:`, error);
-        
+
         // Execute error hooks
-        if (type !== 'error') {
-          await this.execute('error', { 
-            ...context, 
-            error, 
-            hookId: hook.id, 
-            hookType: type 
+        if (type !== "error") {
+          await this.execute("error", {
+            ...context,
+            error,
+            hookId: hook.id,
+            hookType: type
           });
         }
       }
@@ -211,7 +211,7 @@ export function beforeMessage(
   options: { priority?: number; once?: boolean } = {}
 ): string {
   const hookManager = getGlobalHookManager();
-  return hookManager.register('before-message', fn, options);
+  return hookManager.register("before-message", fn, options);
 }
 
 /**
@@ -222,7 +222,7 @@ export function afterMessage(
   options: { priority?: number; once?: boolean } = {}
 ): string {
   const hookManager = getGlobalHookManager();
-  return hookManager.register('after-message', fn, options);
+  return hookManager.register("after-message", fn, options);
 }
 
 /**
@@ -233,7 +233,7 @@ export function beforeCommand(
   options: { priority?: number; once?: boolean } = {}
 ): string {
   const hookManager = getGlobalHookManager();
-  return hookManager.register('before-command', fn, options);
+  return hookManager.register("before-command", fn, options);
 }
 
 /**
@@ -244,7 +244,7 @@ export function afterCommand(
   options: { priority?: number; once?: boolean } = {}
 ): string {
   const hookManager = getGlobalHookManager();
-  return hookManager.register('after-command', fn, options);
+  return hookManager.register("after-command", fn, options);
 }
 
 /**
@@ -255,7 +255,7 @@ export function beforeEvent(
   options: { priority?: number; once?: boolean } = {}
 ): string {
   const hookManager = getGlobalHookManager();
-  return hookManager.register('before-event', fn, options);
+  return hookManager.register("before-event", fn, options);
 }
 
 /**
@@ -266,7 +266,7 @@ export function afterEvent(
   options: { priority?: number; once?: boolean } = {}
 ): string {
   const hookManager = getGlobalHookManager();
-  return hookManager.register('after-event', fn, options);
+  return hookManager.register("after-event", fn, options);
 }
 
 /**
@@ -277,7 +277,7 @@ export function onError(
   options: { priority?: number; once?: boolean } = {}
 ): string {
   const hookManager = getGlobalHookManager();
-  return hookManager.register('error', fn, options);
+  return hookManager.register("error", fn, options);
 }
 
 /**
@@ -321,12 +321,12 @@ export class HookComposer {
    */
   register(manager: HookManager): string[] {
     const ids: string[] = [];
-    
+
     for (const hook of this.hooks) {
       const id = manager.register(hook.type, hook.fn, hook.options);
       ids.push(id);
     }
-    
+
     return ids;
   }
 
@@ -371,10 +371,7 @@ export function conditionalHook(
 /**
  * Debounced hook execution
  */
-export function debouncedHook(
-  fn: HookFunction,
-  delayMs: number
-): HookFunction {
+export function debouncedHook(fn: HookFunction, delayMs: number): HookFunction {
   let timeoutId: NodeJS.Timeout | undefined;
 
   return async (context: HookContext) => {
@@ -398,15 +395,12 @@ export function debouncedHook(
 /**
  * Throttled hook execution
  */
-export function throttledHook(
-  fn: HookFunction,
-  intervalMs: number
-): HookFunction {
+export function throttledHook(fn: HookFunction, intervalMs: number): HookFunction {
   let lastExecution = 0;
 
   return async (context: HookContext) => {
     const now = Date.now();
-    
+
     if (now - lastExecution >= intervalMs) {
       lastExecution = now;
       await fn(context);

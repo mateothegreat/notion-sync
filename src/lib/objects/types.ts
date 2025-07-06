@@ -24,8 +24,8 @@ export const NotionObject = {
  */
 export type NotionObject = (typeof NotionObject)[keyof typeof NotionObject];
 
-export const getObjects = (): NotionObject[] => {
-  return Object.values(NotionObject);
+export const getObjects = (value: string): NotionObject[] => {
+  return value.split(",").map((v) => v.trim() as NotionObject);
 };
 
 export const isNotionObject = (object: string): object is NotionObject => {

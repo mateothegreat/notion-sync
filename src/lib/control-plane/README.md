@@ -17,26 +17,29 @@ A centralized API control plane that serves as the primary communication and coo
 ## Quick Start
 
 ```typescript
-import { createControlPlane, BrokerBus } from '@mateothegreat/notion-sync/control-plane';
+import {
+  createControlPlane,
+  BrokerBus
+} from "@mateothegreat/notion-sync/control-plane";
 
 // Basic usage following the pseudo-code pattern
 const bus = new BrokerBus();
 
-type UserEvent = 
-  | { type: 'user-created', id: number } 
-  | { type: 'user-deleted', id: number };
+type UserEvent =
+  | { type: "user-created"; id: number }
+  | { type: "user-deleted"; id: number };
 
-const channel = bus.channel<UserEvent>('user-events');
+const channel = bus.channel<UserEvent>("user-events");
 
 await channel.subscribe((event) => {
-  if (event.type === 'user-created') {
-    console.log('User created', event.id);
-  } else if (event.type === 'user-deleted') {
-    console.log('User deleted', event.id);
+  if (event.type === "user-created") {
+    console.log("User created", event.id);
+  } else if (event.type === "user-deleted") {
+    console.log("User deleted", event.id);
   }
 });
 
-channel.next({ type: 'user-created', id: 1 });
+channel.next({ type: "user-created", id: 1 });
 ```
 
 ## Core Components
@@ -46,21 +49,21 @@ channel.next({ type: 'user-created', id: 1 });
 The message bus provides centralized message routing with support for both RxJS Subjects and promise-based channels.
 
 ```typescript
-import { createControlPlane } from '@mateothegreat/notion-sync/control-plane';
+import { createControlPlane } from "@mateothegreat/notion-sync/control-plane";
 
 const controlPlane = createControlPlane();
 await controlPlane.start();
 
 // Create a typed channel
-const channel = controlPlane.channel<string>('notifications');
+const channel = controlPlane.channel<string>("notifications");
 
 // Subscribe to messages
 const subscription = channel.subscribe((message) => {
-  console.log('Received:', message);
+  console.log("Received:", message);
 });
 
 // Publish messages
-await channel.publish('Hello, World!');
+await channel.publish("Hello, World!");
 
 subscription.unsubscribe();
 ```
@@ -71,25 +74,27 @@ Supports both mutable (performance-focused) and immutable (predictability-focuse
 
 ```typescript
 // Mutable state for performance-critical scenarios
-const counterState = controlPlane.registerMutableState('counter', { value: 0 });
+const counterState = controlPlane.registerMutableState("counter", {
+  value: 0
+});
 
 // Immutable state with structural sharing
-const userListState = controlPlane.registerImmutableState('users', { 
-  users: [] as Array<{ id: number; name: string }> 
+const userListState = controlPlane.registerImmutableState("users", {
+  users: [] as Array<{ id: number; name: string }>
 });
 
 // Subscribe to changes
 counterState.subscribe((state) => {
-  console.log('Counter:', state.value);
+  console.log("Counter:", state.value);
 });
 
 // Update state using Immer
-counterState.update(draft => {
+counterState.update((draft) => {
   draft.value += 1;
 });
 
-userListState.update(draft => {
-  draft.users.push({ id: 1, name: 'Alice' });
+userListState.update((draft) => {
+  draft.users.push({ id: 1, name: "Alice" });
 });
 ```
 
@@ -100,34 +105,34 @@ Manages component lifecycle with dependency injection.
 ```typescript
 // Define a component
 class ApiClient {
-  id = 'api-client';
-  name = 'ApiClient';
-  state = 'created';
+  id = "api-client";
+  name = "ApiClient";
+  state = "created";
 
   constructor(private apiKey: string) {}
 
   async initialize() {
-    this.state = 'initialized';
+    this.state = "initialized";
   }
 
   async start() {
-    this.state = 'started';
+    this.state = "started";
   }
 
   async stop() {
-    this.state = 'stopped';
+    this.state = "stopped";
   }
 }
 
 // Register component factory
 controlPlane.registerComponent({
-  name: 'ApiClient',
+  name: "ApiClient",
   singleton: true,
   factory: (apiKey: string) => new ApiClient(apiKey)
 });
 
 // Create and manage component
-const client = await controlPlane.createComponent('ApiClient', 'secret-key');
+const client = await controlPlane.createComponent("ApiClient", "secret-key");
 await controlPlane.startComponent(client.id);
 ```
 
@@ -137,7 +142,7 @@ Provides fault tolerance with automatic failure detection and recovery.
 
 ```typescript
 // Get circuit breaker for API calls
-const apiBreaker = controlPlane.getCircuitBreaker('external-api', {
+const apiBreaker = controlPlane.getCircuitBreaker("external-api", {
   failureThreshold: 3,
   resetTimeout: 5000,
   monitoringPeriod: 10000
@@ -147,13 +152,13 @@ const apiBreaker = controlPlane.getCircuitBreaker('external-api', {
 async function makeApiCall() {
   return apiBreaker.execute(async () => {
     // Your API call here
-    return fetch('/api/data');
+    return fetch("/api/data");
   });
 }
 
 // Monitor circuit breaker state
-apiBreaker.onStateChange().subscribe(state => {
-  console.log('Circuit breaker state:', state);
+apiBreaker.onStateChange().subscribe((state) => {
+  console.log("Circuit breaker state:", state);
 });
 ```
 
@@ -166,9 +171,9 @@ Extensible middleware pipeline for message processing.
 controlPlane.use(async (message, next) => {
   console.log(`Processing: ${message.type}`);
   const startTime = Date.now();
-  
+
   await next();
-  
+
   const duration = Date.now() - startTime;
   console.log(`Completed: ${message.type} in ${duration}ms`);
 });
@@ -176,7 +181,7 @@ controlPlane.use(async (message, next) => {
 // Add validation middleware
 controlPlane.use(async (message, next) => {
   if (!message.payload) {
-    throw new Error('Payload required');
+    throw new Error("Payload required");
   }
   await next();
 });
@@ -188,9 +193,9 @@ Modular architecture with plugin-based extensibility.
 
 ```typescript
 const customPlugin = {
-  name: 'metrics-collector',
-  version: '1.0.0',
-  
+  name: "metrics-collector",
+  version: "1.0.0",
+
   async install(context) {
     // Add metrics collection
     context.messageBus.use(async (message, next) => {
@@ -200,14 +205,14 @@ const customPlugin = {
       console.log(`Metric: ${message.type} - ${duration}ms`);
     });
   },
-  
+
   async uninstall(context) {
     // Cleanup
   }
 };
 
 controlPlane.registerPlugin(customPlugin);
-await controlPlane.installPlugin('metrics-collector');
+await controlPlane.installPlugin("metrics-collector");
 ```
 
 ### 7. Hook System
@@ -216,16 +221,16 @@ Lifecycle hooks for custom behavior injection.
 
 ```typescript
 // Register hooks for different events
-controlPlane.registerHook('before-message', async (context) => {
-  console.log('Before processing:', context);
+controlPlane.registerHook("before-message", async (context) => {
+  console.log("Before processing:", context);
 });
 
-controlPlane.registerHook('after-message', async (context) => {
-  console.log('After processing:', context);
+controlPlane.registerHook("after-message", async (context) => {
+  console.log("After processing:", context);
 });
 
-controlPlane.registerHook('error', async (context) => {
-  console.error('Error occurred:', context.error);
+controlPlane.registerHook("error", async (context) => {
+  console.error("Error occurred:", context.error);
 });
 ```
 
@@ -237,20 +242,20 @@ controlPlane.registerHook('error', async (context) => {
 class UserService {
   constructor(private channel: Subject<{ id: number; name: string }>) {
     this.channel.subscribe((message) => {
-      console.log('UserService received:', message);
+      console.log("UserService received:", message);
     });
   }
 
   update() {
-    this.channel.next({ id: 1, name: 'Peter' });
+    this.channel.next({ id: 1, name: "Peter" });
   }
 }
 
 // Register as component
 controlPlane.registerComponent({
-  name: 'UserService',
+  name: "UserService",
   factory: () => {
-    const channel = controlPlane.brokerChannel('user-updates');
+    const channel = controlPlane.brokerChannel("user-updates");
     return new UserService(channel);
   }
 });
@@ -259,9 +264,9 @@ controlPlane.registerComponent({
 ### State Selectors
 
 ```typescript
-import { createSelector } from '@mateothegreat/notion-sync/control-plane';
+import { createSelector } from "@mateothegreat/notion-sync/control-plane";
 
-const userState = controlPlane.registerImmutableState('users', {
+const userState = controlPlane.registerImmutableState("users", {
   users: [],
   loading: false
 });
@@ -269,11 +274,11 @@ const userState = controlPlane.registerImmutableState('users', {
 // Create derived state selector
 const userCountSelector = createSelector(
   userState,
-  state => state.users.length
+  (state) => state.users.length
 );
 
-userCountSelector.subscribe(count => {
-  console.log('User count:', count);
+userCountSelector.subscribe((count) => {
+  console.log("User count:", count);
 });
 ```
 
@@ -281,18 +286,18 @@ userCountSelector.subscribe(count => {
 
 ```typescript
 // Global error handling
-controlPlane.registerHook('error', async (context) => {
+controlPlane.registerHook("error", async (context) => {
   const { error, operation } = context;
-  
+
   // Log error
   console.error(`Error in ${operation}:`, error);
-  
+
   // Send to error tracking service
   await errorTracker.report(error, { operation });
-  
+
   // Update error state
-  const errorState = controlPlane.getState('errors');
-  errorState?.update(draft => {
+  const errorState = controlPlane.getState("errors");
+  errorState?.update((draft) => {
     draft.errors.push({
       error: error.message,
       operation,
@@ -310,26 +315,26 @@ controlPlane.registerHook('error', async (context) => {
 // Before: EventEmitter daisy-chaining
 class OldExportManager extends EventEmitter {
   async export() {
-    this.emit('progress', { processed: 0, total: 100 });
+    this.emit("progress", { processed: 0, total: 100 });
     // ... export logic
-    this.emit('complete', { success: true });
+    this.emit("complete", { success: true });
   }
 }
 
 // After: Control Plane channels
 class NewExportManager {
   private progressChannel: Subject<{ processed: number; total: number }>;
-  
+
   constructor(private controlPlane: ControlPlane) {
-    this.progressChannel = controlPlane.brokerChannel('export-progress');
+    this.progressChannel = controlPlane.brokerChannel("export-progress");
   }
-  
+
   async export() {
     this.progressChannel.next({ processed: 0, total: 100 });
     // ... export logic
     this.progressChannel.next({ processed: 100, total: 100 });
   }
-  
+
   onProgress(handler: (progress: any) => void) {
     return this.progressChannel.subscribe(handler);
   }
@@ -340,10 +345,10 @@ class NewExportManager {
 
 ```typescript
 // Protect Notion API calls
-const notionBreaker = controlPlane.getCircuitBreaker('notion-api', {
+const notionBreaker = controlPlane.getCircuitBreaker("notion-api", {
   failureThreshold: 5,
   resetTimeout: 30000,
-  expectedErrors: ['rate_limited', 'timeout']
+  expectedErrors: ["rate_limited", "timeout"]
 });
 
 async function fetchNotionPage(pageId: string) {
@@ -357,24 +362,24 @@ async function fetchNotionPage(pageId: string) {
 
 ```typescript
 // Export configuration state
-const exportConfig = controlPlane.registerImmutableState('export-config', {
-  outputPath: '',
-  format: 'json',
+const exportConfig = controlPlane.registerImmutableState("export-config", {
+  outputPath: "",
+  format: "json",
   databases: [] as string[]
 });
 
 // Real-time progress state
-const exportProgress = controlPlane.registerMutableState('export-progress', {
+const exportProgress = controlPlane.registerMutableState("export-progress", {
   isRunning: false,
   processed: 0,
   total: 0,
-  currentOperation: ''
+  currentOperation: ""
 });
 
 // Update progress efficiently
-exportProgress.update(draft => {
+exportProgress.update((draft) => {
   draft.processed += 1;
-  draft.currentOperation = 'processing-pages';
+  draft.currentOperation = "processing-pages";
 });
 ```
 
@@ -395,7 +400,7 @@ const messageCount = 10000;
 const startTime = Date.now();
 
 for (let i = 0; i < messageCount; i++) {
-  await controlPlane.publish('perf-test', { id: i });
+  await controlPlane.publish("perf-test", { id: i });
 }
 
 const duration = Date.now() - startTime;
@@ -425,24 +430,27 @@ npm run test:watch         # Watch mode for development
 ### From EventEmitter
 
 1. **Identify EventEmitter usage**:
+
    ```bash
    grep -r "EventEmitter\|\.emit\|\.on(" src/
    ```
 
 2. **Replace with channels**:
+
    ```typescript
    // Before
-   this.emit('progress', data);
-   
+   this.emit("progress", data);
+
    // After
    this.progressChannel.next(data);
    ```
 
 3. **Update subscribers**:
+
    ```typescript
    // Before
-   emitter.on('progress', handler);
-   
+   emitter.on("progress", handler);
+
    // After
    channel.subscribe(handler);
    ```
@@ -452,16 +460,17 @@ npm run test:watch         # Watch mode for development
 Use the compatibility layer for gradual migration:
 
 ```typescript
-import { EventEmitterMigrationHelper } from './examples/notion-sync-integration';
+import { EventEmitterMigrationHelper } from "./examples/notion-sync-integration";
 
 const migrationHelper = new EventEmitterMigrationHelper(controlPlane);
 
 // Create backward-compatible interface
-const compatEmitter = migrationHelper.createCompatibilityLayer('legacy-events');
+const compatEmitter =
+  migrationHelper.createCompatibilityLayer("legacy-events");
 
 // Use like EventEmitter
-compatEmitter.emit('event', data);
-compatEmitter.on('event', handler);
+compatEmitter.emit("event", data);
+compatEmitter.on("event", handler);
 ```
 
 ## Configuration
@@ -470,11 +479,11 @@ compatEmitter.on('event', handler);
 
 ```typescript
 const controlPlane = createControlPlane({
-  adapter: new InMemoryAdapter(),     // Message bus adapter
-  enableLogging: true,                // Built-in logging plugin
-  enableMetrics: true,                // Built-in metrics plugin
-  enableHealthCheck: true,            // Built-in health check plugin
-  autoStartComponents: true           // Auto-start registered components
+  adapter: new InMemoryAdapter(), // Message bus adapter
+  enableLogging: true, // Built-in logging plugin
+  enableMetrics: true, // Built-in metrics plugin
+  enableHealthCheck: true, // Built-in health check plugin
+  autoStartComponents: true // Auto-start registered components
 });
 ```
 
@@ -482,12 +491,13 @@ const controlPlane = createControlPlane({
 
 ```typescript
 const breakerConfig = {
-  failureThreshold: 5,        // Failures before opening
-  resetTimeout: 30000,        // Time before retry (ms)
-  monitoringPeriod: 60000,    // Monitoring window (ms)
-  expectedErrors: [           // Errors that don't count as failures
-    'ValidationError',
-    'rate_limited'
+  failureThreshold: 5, // Failures before opening
+  resetTimeout: 30000, // Time before retry (ms)
+  monitoringPeriod: 60000, // Monitoring window (ms)
+  expectedErrors: [
+    // Errors that don't count as failures
+    "ValidationError",
+    "rate_limited"
   ]
 };
 ```

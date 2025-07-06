@@ -65,7 +65,10 @@ export class RateLimiter {
   private lastRequestTime: number = 0;
   private consecutiveErrors: number = 0;
 
-  constructor(private maxRequestsPerMinute: number = 60, private minInterval: number = 100) {}
+  constructor(
+    private maxRequestsPerMinute: number = 60,
+    private minInterval: number = 100
+  ) {}
 
   /**
    * Wait for rate limit before making a request.
@@ -161,7 +164,10 @@ export class CircuitBreaker {
   private lastFailureTime: number = 0;
   private state: "closed" | "open" | "half-open" = "closed";
 
-  constructor(private failureThreshold: number = 5, private resetTimeout: number = 60000) {}
+  constructor(
+    private failureThreshold: number = 5,
+    private resetTimeout: number = 60000
+  ) {}
 
   /**
    * Check if the circuit breaker allows the operation.

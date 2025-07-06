@@ -1,5 +1,5 @@
-import { CircuitBreaker, delay } from "$lib/export/util";
 import { APIErrorCode, ClientErrorCode, isNotionClientError } from "@notionhq/client";
+import { CircuitBreaker, delay } from "./export/util";
 
 /**
  * Error types that should trigger a retry.
@@ -387,3 +387,36 @@ export async function collectPaginatedAPI<T extends { next_cursor: string | null
   }
   return results;
 }
+
+/**
+ * Smart retry operation (alias for retry function).
+ *
+ * @param operation - The operation to retry.
+ * @param operationName - The name of the operation.
+ * @param context - Optional retry context for smarter retry decisions.
+ * @param maxRetries - The maximum number of retries.
+ * @param baseDelay - The base delay between retries.
+ * @param timeout - The base timeout for the operation.
+ * @param eventEmitter - Optional event emitter for retry events.
+ *
+ * @returns A promise that resolves when the operation is completed.
+ */
+export const smartRetryOperation = async <T>(
+  operation: () => Promise<T>,
+  operationName: string,
+  context?: RetryContext,
+  maxRetries?: number,
+  baseDelay?: number,
+  timeout?: number,
+  eventEmitter?: OperationEventEmitter
+): Promise<T> => {
+  return retry({
+    fn: operation,
+    operation: operationName,
+    context,
+    maxRetries,
+    baseDelay,
+    timeout,
+    emitter: eventEmitter
+  });
+};
