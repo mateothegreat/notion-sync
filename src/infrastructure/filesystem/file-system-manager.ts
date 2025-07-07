@@ -4,11 +4,12 @@
  * Central manager for all file system operations with atomic transactions
  */
 
+import { ExportFormat } from "$lib/exporters/exporter";
 import fs from "fs";
 import path from "path";
 import { promisify } from "util";
 import { FileSystemEvents } from "../../core/events";
-import { ExportFormat, NotionBlock, NotionDatabase, NotionPage } from "../../shared/types";
+import { NotionBlock, NotionDatabase, NotionPage } from "../../lib/notion/types";
 import { AtomicFileOperationManager } from "./atomic-operations";
 import { WorkspaceOrganizer } from "./organizers/workspace-organizer";
 import { AtomicFileOperation, FileSystemConfig, FileWriter, FileWriteResult } from "./types";

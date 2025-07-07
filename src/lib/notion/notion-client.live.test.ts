@@ -1,9 +1,9 @@
 import { afterAll, test as baseTest, describe, expect, vi } from "vitest";
 import { TestContext } from "../../../test/extentions";
 import { getComplexityTimeout } from "../../../test/utils";
+import { toNotionID } from "../../infrastructure/notion/util";
 import { config } from "../../lib/config-loader";
 import { NotionClient } from "./notion-client";
-import { toNotionID } from "./util";
 
 const test = baseTest.extend<TestContext>({
   notionClient: ({}, use) => use(new NotionClient({ apiKey: config.token }))

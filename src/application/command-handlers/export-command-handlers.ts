@@ -6,9 +6,9 @@
 
 import { ProgressService } from "../../core/services/progress-service";
 import { FileSystemManager } from "../../infrastructure/filesystem/file-system-manager";
-import { NotionClient } from "../../infrastructure/notion/notion-client";
 import { CommandHandler } from "../../lib/control-plane/types";
 import { ExportService } from "../../lib/export/export-service";
+import { NotionClient } from "../../lib/notion/notion-client";
 import { ExportConfiguration, ExportFormat } from "../../shared/types/index";
 
 /**

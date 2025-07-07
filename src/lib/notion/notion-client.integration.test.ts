@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, suite, test } from "vitest";
-import { config } from "../../lib/config/config-loader";
-import { log } from "../../lib/log";
+import { config } from "../config/config-loader";
+import { log } from "../log";
 import { NotionClient } from "./notion-client";
 
 let notionClient: NotionClient;

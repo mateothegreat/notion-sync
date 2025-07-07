@@ -9,9 +9,9 @@ export {
   ProgressEvents
 } from "./core/events";
 export { ProgressService } from "./core/services/progress-service";
-export { NotionClient } from "./infrastructure/notion/notion-client";
 export * from "./lib";
 export { BrokerBus, ControlPlane, createControlPlane, InMemoryAdapter, MessageBus } from "./lib/control-plane";
 export { ExportService } from "./lib/export/export-service";
+export { NotionClient } from "./lib/notion/notion-client";
 export * from "./shared/errors";
 export * from "./shared/types";

@@ -15,7 +15,6 @@
 
 import { Client } from "@notionhq/client";
 import { PropertyItemListResponse, PropertyItemObjectResponse } from "@notionhq/client/build/src/api-endpoints";
-import { log } from "../../lib/log";
 import { ErrorFactory, NotionApiError, RateLimitError } from "../../shared/errors/index";
 import {
   NotionBlock,
@@ -31,6 +30,7 @@ import {
   PropertyItemType,
   RateLimitInfo
 } from "../../shared/types/index";
+import { log } from "../log";
 
 export interface NotionApiClient {
   getPage(pageId: string): Promise<NotionPage>;
