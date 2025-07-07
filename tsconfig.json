@@ -20,6 +20,6 @@
       "$core/*": ["src/core/*"]
     }
   },
-  "include": ["./src/**/*"],
+  "include": ["./src/**/*", "vitest-env.d.ts"],
   "exclude": ["**/*test*", "./src/old/**/*"]
 }
