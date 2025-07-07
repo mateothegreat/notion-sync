@@ -4,15 +4,10 @@
  * Core business logic for export operations
  */
 
-import { ExportError, ValidationError } from "../../shared/errors/index";
-import {
-  Entity,
-  ErrorInfo,
-  ExportConfiguration,
-  ExportFormat,
-  ExportStatus,
-  ProgressInfo
-} from "../../shared/types/index";
+import { ResolvedCommandConfig } from "$lib/config/loader";
+import { ExportFormat } from "$lib/exporters/exporter";
+import { ExportError, ValidationError } from "../../shared/errors";
+import { Entity, ErrorInfo, ExportStatus, ProgressInfo } from "../../shared/types";
 
 export class Export implements Entity {
   public readonly id: string;
@@ -21,7 +16,7 @@ export class Export implements Entity {
 
   constructor(
     id: string,
-    public readonly configuration: ExportConfiguration,
+    public readonly configuration: ResolvedCommandConfig<"export">,
     public status: ExportStatus = ExportStatus.PENDING,
     public progress: ProgressInfo = {
       processed: 0,
@@ -45,15 +40,15 @@ export class Export implements Entity {
   }
 
   private validateConfiguration(): void {
-    if (!this.configuration.outputPath) {
+    if (!this.configuration.path) {
       throw new ValidationError("Output path is required");
     }
 
-    if (this.configuration.databases.length === 0 && this.configuration.pages.length === 0) {
+    if (this.configuration.databases.length === 0 && this.configuration.pages?.length === 0) {
       throw new ValidationError("At least one database or page must be specified");
     }
 
-    if (!Object.values(ExportFormat).includes(this.configuration.format as any)) {
+    if (!Object.values(ExportFormat).includes(this.configuration.format)) {
       throw new ValidationError(`Invalid export format: ${this.configuration.format}`);
     }
   }
@@ -200,7 +195,7 @@ export class Export implements Entity {
 
 export interface ExportSnapshot {
   id: string;
-  configuration: ExportConfiguration;
+  configuration: ResolvedCommandConfig<"export">;
   status: ExportStatus;
   progress: ProgressInfo;
   outputPath?: string;
@@ -213,12 +208,12 @@ export interface ExportSnapshot {
 
 // Export Factory
 export class ExportFactory {
-  static create(configuration: ExportConfiguration): Export {
+  static create(configuration: ResolvedCommandConfig<"export">): Export {
     const id = crypto.randomUUID();
     return new Export(id, configuration);
   }
 
-  static createWithId(id: string, configuration: ExportConfiguration): Export {
+  static createWithId(id: string, configuration: ResolvedCommandConfig<"export">): Export {
     return new Export(id, configuration);
   }
 }
@@ -235,7 +230,7 @@ export interface ExportRepository {
 
 // Export Service Interface
 export interface ExportService {
-  createExport(configuration: ExportConfiguration): Promise<Export>;
+  createExport(configuration: ResolvedCommandConfig<"export">): Promise<Export>;
   startExport(id: string): Promise<void>;
   cancelExport(id: string, reason: string): Promise<void>;
   getExport(id: string): Promise<Export>;

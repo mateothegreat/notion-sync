@@ -1,4 +1,4 @@
-import { baseFlags } from "$lib/config/core";
+import { createCommandFlags } from "$lib/config/loader";
 import { Command, Interfaces } from "@oclif/core";
 
 export type Flags<T extends typeof Command> = Interfaces.InferredFlags<(typeof BaseCommand)["baseFlags"] & T["flags"]>;
@@ -10,7 +10,7 @@ export abstract class BaseCommand<T extends typeof Command> extends Command {
   /**
    * Base flags available to all commands (global flags).
    */
-  static baseFlags = baseFlags;
+  static baseFlags = createCommandFlags("*");
 
   protected flags!: Flags<T>;
   protected args!: Args<T>;

@@ -5,7 +5,7 @@
  */
 
 import { ErrorInfo, ProgressInfo } from "../../shared/types/index";
-import { ProgressEvents } from "../events/index";
+import { ProgressEvents } from "../events/events";
 
 export interface ProgressTracker {
   exportId: string;
@@ -89,7 +89,10 @@ export class ProgressService {
 
     // Publish event
     await this.eventPublisher(
-      ProgressEvents.sectionCompleted(exportId, sectionName, section.processedItems, duration, section.errors)
+      ProgressEvents.sectionCompleted(exportId, sectionName, section.processedItems, duration, section.errors, {
+        caller: "ProgressService",
+        message: `Completed section ${sectionName}`
+      })
     );
   }
 

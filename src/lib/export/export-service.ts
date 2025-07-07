@@ -6,12 +6,11 @@
  * with the WorkspaceExporter for actual export execution.
  */
 
-import { log } from "$lib/log";
-import { Export, ExportFactory, ExportRepository } from "../../core/domain/export";
-import { ExportEvents } from "../../core/events/index";
+import { ResolvedCommandConfig } from "$lib/config/loader";
+import { ExportEvents } from "../../core/events/events";
 import { ProgressService } from "../../core/services/progress-service";
-import { ExportAlreadyRunningError, ExportError, ExportNotFoundError } from "../../shared/errors/index";
-import { ExportConfiguration } from "../../shared/types/index";
+import { ExportError, ExportNotFoundError } from "../../shared/errors";
+import { Export, ExportFactory, ExportRepository } from "./domain";
 
 export class ExportService {
   constructor(
@@ -20,26 +19,13 @@ export class ExportService {
     private progressService?: ProgressService
   ) {}
 
-  async create(configuration: ExportConfiguration): Promise<Export> {
-    // Check for existing running exports with same configuration
-    const runningExports = await this.exportRepository.findRunning();
-    log.debugging.inspect("Running exports", runningExports);
-    const conflictingExport = runningExports.find((exp) =>
-      this.configurationsConflict(exp.configuration, configuration)
-    );
+  async create(configuration: ResolvedCommandConfig<"export">): Promise<Export> {
+    const exp = ExportFactory.create(configuration);
 
-    if (conflictingExport) {
-      throw new ExportAlreadyRunningError(`Export already running for similar configuration: ${conflictingExport.id}`);
-    }
+    await this.exportRepository.save(exp);
+    await this.eventPublisher(ExportEvents.started(exp.id, configuration));
 
-    // Create new export
-    const export_ = ExportFactory.create(configuration);
-    await this.exportRepository.save(export_);
-
-    // Publish event
-    await this.eventPublisher(ExportEvents.started(export_.id, configuration));
-
-    return export_;
+    return exp;
   }
 
   async startExport(id: string): Promise<void> {
@@ -138,42 +124,11 @@ export class ExportService {
       throw new ExportError(`Cannot restart export in ${export_.status} status`);
     }
 
-    // Create new export with same configuration
     const newExport = ExportFactory.create(export_.configuration);
-    await this.exportRepository.save(newExport);
 
-    // Publish event
+    await this.exportRepository.save(newExport);
     await this.eventPublisher(ExportEvents.started(newExport.id, newExport.configuration));
 
     return newExport;
-  }
-
-  private configurationsConflict(config1: ExportConfiguration, config2: ExportConfiguration): boolean {
-    // Check if configurations would write to the same output path
-    if (config1.outputPath === config2.outputPath) {
-      return true;
-    }
-
-    // Check if they're trying to export the same resources
-    const databases1 = new Set(config1.databases);
-    const databases2 = new Set(config2.databases);
-    const pages1 = new Set(config1.pages);
-    const pages2 = new Set(config2.pages);
-
-    // Check for overlapping databases
-    for (const db of databases2) {
-      if (databases1.has(db)) {
-        return true;
-      }
-    }
-
-    // Check for overlapping pages
-    for (const page of pages2) {
-      if (pages1.has(page)) {
-        return true;
-      }
-    }
-
-    return false;
   }
 }

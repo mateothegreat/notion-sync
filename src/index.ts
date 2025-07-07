@@ -1,5 +1,3 @@
-export { Export, ExportFactory } from "./core/domain/export";
-export { Block, Database, NotionObjectFactory, Page } from "./core/domain/notion-objects";
 export {
   CircuitBreakerEvents,
   ExportEvents,
@@ -7,10 +5,11 @@ export {
   NotionEvents,
   PerformanceEvents,
   ProgressEvents
-} from "./core/events";
+} from "./core/events/events";
 export { ProgressService } from "./core/services/progress-service";
 export * from "./lib";
 export { BrokerBus, ControlPlane, createControlPlane, InMemoryAdapter, MessageBus } from "./lib/control-plane";
+export { Export, ExportFactory } from "./lib/export/domain";
 export { ExportService } from "./lib/export/export-service";
 export { NotionClient } from "./lib/notion/notion-client";
 export * from "./shared/errors";

@@ -4,7 +4,10 @@
  * Core types used throughout the application
  */
 
-import { ExportFormat } from "$lib/exporters/exporter";
+import { ExportFormat as ExporterFormat } from "$lib/exporters/exporter";
+
+export type ExportFormat = ExporterFormat;
+export { ExporterFormat as ExportFormatEnum };
 
 // Base types
 export interface Entity {
@@ -17,6 +20,11 @@ export interface ValueObject {
   equals(other: ValueObject): boolean;
 }
 
+export interface DomainEventMetadata {
+  caller: string;
+  message?: string;
+}
+
 export interface DomainEvent {
   id: string;
   type: string;
@@ -25,7 +33,7 @@ export interface DomainEvent {
   version: number;
   timestamp: Date;
   payload: Record<string, any>;
-  metadata?: Record<string, any>;
+  metadata?: DomainEventMetadata;
 }
 
 // Command/Query patterns
@@ -33,14 +41,14 @@ export interface Command {
   id: string;
   type: string;
   payload: Record<string, any>;
-  metadata?: Record<string, any>;
+  metadata?: DomainEventMetadata;
 }
 
 export interface Query {
   id: string;
   type: string;
   parameters: Record<string, any>;
-  metadata?: Record<string, any>;
+  metadata?: DomainEventMetadata;
 }
 
 export interface CommandResult<T = any> {
@@ -54,7 +62,7 @@ export interface QueryResult<T = any> {
   success: boolean;
   data?: T;
   error?: Error;
-  metadata?: Record<string, any>;
+  metadata?: DomainEventMetadata;
 }
 
 // Progress tracking
@@ -74,6 +82,16 @@ export interface ErrorInfo {
   timestamp: Date;
   context?: Record<string, any>;
   stack?: string;
+}
+
+export interface ExportConfiguration {
+  outputPath: string;
+  format: ExportFormat;
+  includeBlocks: boolean;
+  includeComments: boolean;
+  includeProperties: boolean;
+  databases: string[];
+  pages: string[];
 }
 
 export interface ExportFilters {
@@ -127,7 +145,7 @@ export interface CircuitBreakerStats {
 // Configuration
 export interface ApplicationConfig {
   notion: NotionConfig;
-  export: ExportConfig;
+  export: ExportConfiguration;
   performance: PerformanceConfig;
   logging: LoggingConfig;
 }
@@ -138,14 +156,6 @@ export interface NotionConfig {
   baseUrl?: string;
   timeout?: number;
   retryAttempts?: number;
-}
-
-export interface ExportConfig {
-  defaultOutputPath: string;
-  defaultFormat: ExportFormat;
-  maxConcurrency: number;
-  chunkSize: number;
-  enableResume: boolean;
 }
 
 export interface PerformanceConfig {
@@ -167,18 +177,4 @@ export interface LoggingConfig {
   format: "json" | "text";
   outputs: ("console" | "file")[];
   filePath?: string;
-}
-
-// File System Configuration
-export interface FileSystemConfig {
-  baseOutputPath: string;
-  maxFileSize: number;
-  enableCompression: boolean;
-  compressionLevel: number;
-  enableAtomicOperations: boolean;
-  enableBackup: boolean;
-  namingStrategy: "id" | "title" | "slug" | "timestamp";
-  organizationStrategy: "flat" | "hierarchical" | "by-type" | "by-date";
-  encoding: "utf8" | "utf16le" | "ascii";
-  enableChecksums: boolean;
 }

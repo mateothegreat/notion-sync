@@ -6,16 +6,16 @@
  * incorporating the directory creation and metadata export functionality.
  */
 
+import { ResolvedCommandConfig } from "$lib/config/loader";
 import { Client } from "@notionhq/client";
 import { EventEmitter } from "events";
 import { promises as fs } from "fs";
 import path from "path";
-import { Export } from "../../core/domain/export";
-import { FileSystemEvents } from "../../core/events";
+import { FileSystemEvents } from "../../core/events/events";
 import { ProgressService } from "../../core/services/progress-service";
 import { log } from "../log";
 import { OperationEventEmitter, retry } from "../operations";
-import { ExporterConfig } from "./config";
+import { Export } from "./domain";
 
 declare global {
   interface Date {
@@ -80,7 +80,7 @@ export interface WorkspaceExportResult {
  */
 export class WorkspaceExporter extends EventEmitter implements OperationEventEmitter {
   private client: Client;
-  private config: ExporterConfig;
+  private config: ResolvedCommandConfig<"export">;
   private progressService: ProgressService;
   private eventPublisher: (event: any) => Promise<void>;
   private errors: Array<{ type: string; id?: string; error: string }> = [];
@@ -96,7 +96,11 @@ export class WorkspaceExporter extends EventEmitter implements OperationEventEmi
    * Returns:
    * - A new WorkspaceExporter instance
    */
-  constructor(config: ExporterConfig, progressService: ProgressService, eventPublisher: (event: any) => Promise<void>) {
+  constructor(
+    config: ResolvedCommandConfig<"export">,
+    progressService: ProgressService,
+    eventPublisher: (event: any) => Promise<void>
+  ) {
     super();
     this.config = config;
     this.progressService = progressService;
@@ -210,8 +214,8 @@ export class WorkspaceExporter extends EventEmitter implements OperationEventEmi
           op: "read",
           priority: "normal"
         },
-        maxRetries: this.config.retries,
-        baseDelay: this.config.rate,
+        maxRetries: 3,
+        baseDelay: 3000,
         timeout: this.config.timeout,
         emitter: this
       });
@@ -221,9 +225,9 @@ export class WorkspaceExporter extends EventEmitter implements OperationEventEmi
         exportVersion: "1.0.0",
         user: userInfo,
         settings: {
-          includeArchived: this.config.archived,
-          includeComments: this.config.comments,
-          maxDepth: this.config.depth
+          includeArchived: this.config["include-archived"],
+          includeComments: this.config["include-comments"],
+          maxDepth: 10
         }
       };
 

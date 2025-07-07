@@ -1,10 +1,11 @@
 /**
  * File System Types and Interfaces
- * 
+ *
  * Core types for the file system implementation
  */
 
-import { NotionBlock, NotionDatabase, NotionPage, ExportFormat } from "../../shared/types";
+import { ExportFormat } from "$lib/exporters/exporter";
+import { NotionBlock, NotionDatabase, NotionPage } from "$lib/notion/types";
 
 /**
  * Base interface for all file writers
@@ -150,7 +151,7 @@ export interface AtomicFileOperation {
  * Individual file operation
  */
 export interface FileOperation {
-  type: 'create' | 'update' | 'delete' | 'move';
+  type: "create" | "update" | "delete" | "move";
   sourcePath?: string;
   targetPath: string;
   data?: Buffer | string;
@@ -167,9 +168,9 @@ export interface FileSystemConfig {
   compressionLevel: number;
   enableAtomicOperations: boolean;
   enableBackup: boolean;
-  namingStrategy: 'id' | 'title' | 'slug' | 'timestamp';
-  organizationStrategy: 'flat' | 'hierarchical' | 'by-type' | 'by-date';
-  encoding: 'utf8' | 'utf16le' | 'ascii';
+  namingStrategy: "id" | "title" | "slug" | "timestamp";
+  organizationStrategy: "flat" | "hierarchical" | "by-type" | "by-date";
+  encoding: "utf8" | "utf16le" | "ascii";
   enableChecksums: boolean;
 }
 
@@ -188,22 +189,22 @@ export interface JsonFormatOptions {
   includeMetadata: boolean;
   includeBlocks: boolean;
   includeProperties: boolean;
-  dateFormat: 'iso' | 'timestamp' | 'human';
+  dateFormat: "iso" | "timestamp" | "human";
 }
 
 export interface MarkdownFormatOptions {
   includeMetadata: boolean;
   includeFrontmatter: boolean;
-  frontmatterFormat: 'yaml' | 'json' | 'toml';
-  headingStyle: 'atx' | 'setext';
-  codeBlockStyle: 'fenced' | 'indented';
-  linkStyle: 'inline' | 'reference';
-  imageHandling: 'embed' | 'link' | 'download';
+  frontmatterFormat: "yaml" | "json" | "toml";
+  headingStyle: "atx" | "setext";
+  codeBlockStyle: "fenced" | "indented";
+  linkStyle: "inline" | "reference";
+  imageHandling: "embed" | "link" | "download";
 }
 
 export interface HtmlFormatOptions {
   includeCSS: boolean;
-  cssFramework: 'none' | 'bootstrap' | 'tailwind' | 'custom';
+  cssFramework: "none" | "bootstrap" | "tailwind" | "custom";
   customCSS?: string;
   includeJavaScript: boolean;
   templatePath?: string;
@@ -211,10 +212,10 @@ export interface HtmlFormatOptions {
 }
 
 export interface CsvFormatOptions {
-  delimiter: ',' | ';' | '\t' | '|';
-  quote: '"' | "'" | '`';
-  escape: '\\' | '"';
+  delimiter: "," | ";" | "\t" | "|";
+  quote: '"' | "'" | "`";
+  escape: "\\" | '"';
   includeHeaders: boolean;
   flattenObjects: boolean;
-  arrayDelimiter: '|' | ';' | ',';
+  arrayDelimiter: "|" | ";" | ",";
 }

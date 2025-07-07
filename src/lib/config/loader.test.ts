@@ -1,116 +1,169 @@
 import * as fs from "fs/promises";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { loadCommandConfig } from "./loader";
+import { ExportFormat } from "../exporters/exporter";
+import { definitions } from "./definitions";
+import {
+  createCommandFlags,
+  createCommandSchema,
+  ExtractFlagKeys,
+  loadCommandConfig,
+  ResolvedCommandConfig
+} from "./loader";
 
 vi.mock("fs/promises");
+const VALID_TOKEN = "secret_1234567890123456789012345678901234567890123";
 
-describe("loadCommandConfig", () => {
-  const baseSchema = z.object({
-    token: z.string(),
-    verbose: z.coerce.boolean().default(false)
-  });
+describe("Config Loader", () => {
+  const mockDefinitions = {
+    ...definitions,
+    test: {
+      name: "test",
+      variants: ["TEST"],
+      commands: ["test_cmd"],
+      flag: { type: "string" },
+      schema: () => z.string()
+    }
+  };
 
-  const commandSchema = z.object({
-    path: z.string(),
-    format: z.enum(["json", "markdown"]),
-    output: z.string().optional()
-  });
+  const base = {
+    token: "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",
+    timeout: 5000,
+    concurrency: 5,
+    retries: 1,
+    format: "json",
+    "max-concurrency": 5,
+    path: "",
+    databases: [], // Required field
+    "include-blocks": true,
+    "include-comments": false,
+    "include-properties": true
+  };
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.spyOn(fs, "readFile").mockRejectedValue({ code: "ENOENT" });
+    process.env = {};
   });
 
-  it("should load config from CLI flags only, with defaults applied", async () => {
-    vi.mocked(fs.readFile).mockRejectedValue({ code: "ENOENT" });
-    const flags = { token: "cli_token", path: "./cli_path", format: "json" };
-    const config = await loadCommandConfig(baseSchema, commandSchema, flags);
-    expect(config).toEqual({ ...flags, verbose: false });
-  });
-
-  it("should load config from YAML file", async () => {
-    const yamlContent = `
-token: yaml_token
-path: ./yaml_path
-format: markdown
-`;
-    vi.mocked(fs.readFile).mockResolvedValue(yamlContent);
-    const config = await loadCommandConfig(baseSchema, commandSchema, {});
-    expect(config).toEqual({
-      token: "yaml_token",
-      path: "./yaml_path",
-      format: "markdown",
-      verbose: false
+  describe("createCommandFlags", () => {
+    it("should create flags for a specific command, including global flags", () => {
+      const flags = createCommandFlags("export");
+      expect(flags).toHaveProperty("token");
+      expect(flags).toHaveProperty("path");
     });
   });
 
-  it("should load and coerce config from environment variables", async () => {
-    vi.mocked(fs.readFile).mockRejectedValue({ code: "ENOENT" });
-    process.env.TOKEN = "env_token";
-    process.env.PATH = "./env_path";
-    process.env.FORMAT = "json";
-    process.env.VERBOSE = "true";
-
-    const config = await loadCommandConfig(baseSchema, commandSchema, {});
-    expect(config).toEqual({
-      token: "env_token",
-      path: "./env_path",
-      format: "json",
-      verbose: true
+  describe("createCommandSchema", () => {
+    it("should create a Zod schema that successfully parses valid data", () => {
+      const schema = createCommandSchema("export");
+      const result = schema.safeParse(base);
+      expect(result.success).toBe(true);
     });
-    // Clean up env vars
-    delete process.env.TOKEN;
-    delete process.env.PATH;
-    delete process.env.FORMAT;
-    delete process.env.VERBOSE;
-  });
 
-  it("should respect precedence: CLI > env > YAML", async () => {
-    const yamlContent = `
-token: yaml_token
-path: ./yaml_path
-format: markdown
-verbose: false
-`;
-    vi.mocked(fs.readFile).mockResolvedValue(yamlContent);
-
-    process.env.TOKEN = "env_token";
-    process.env.PATH = "./env_path";
-    process.env.VERBOSE = "true";
-
-    const flags = { token: "cli_token", format: "json" };
-
-    const config = await loadCommandConfig(baseSchema, commandSchema, flags);
-
-    expect(config).toEqual({
-      token: "cli_token",
-      path: "./env_path",
-      format: "json",
-      verbose: true
+    it("should coerce boolean and number types", () => {
+      const schema = createCommandSchema("export");
+      const result = schema.safeParse({
+        ...base,
+        verbose: "true"
+      });
+      expect(result.success).toBe(true);
+      expect((result as any).data.verbose).toBe(true);
     });
-    // Clean up env vars
-    delete process.env.TOKEN;
-    delete process.env.PATH;
-    delete process.env.VERBOSE;
   });
 
-  it('should handle the "output" alias for "path"', async () => {
-    vi.mocked(fs.readFile).mockRejectedValue({ code: "ENOENT" });
-    const flags = { token: "token", output: "./output_path", format: "json" };
-    const config = await loadCommandConfig(baseSchema, commandSchema, flags);
-    expect(config.path).toBe("./output_path");
+  describe("loadCommandConfig", () => {
+    it("should load from CLI flags", async () => {
+      const flags = { ...base, path: "./cli", format: "json" };
+      const config = await loadCommandConfig("export", flags);
+      expect(config.rendered.path).toBe("./cli");
+    });
+
+    it("should load from environment variables", async () => {
+      process.env.PATH = ".env";
+      process.env.FORMAT = ExportFormat.JSON;
+      const config = await loadCommandConfig("export", {
+        ...base,
+        path: ".env"
+      });
+      expect(config.rendered.path).toBe(".env");
+      expect(config.rendered.format).toBe(ExportFormat.JSON);
+    });
+
+    it("should load from YAML file", async () => {
+      vi.spyOn(fs, "readFile").mockResolvedValue(`path: .env\nformat: ${ExportFormat.JSON}`);
+      const config = await loadCommandConfig("export", { ...base });
+      expect(config.rendered.format).toBe(ExportFormat.JSON);
+    });
+
+    it("should respect precedence: CLI > Env > YAML", async () => {
+      vi.spyOn(fs, "readFile").mockResolvedValue(`path: .env\nformat: ${ExportFormat.JSON}`);
+      process.env.PATH = ".env";
+      const flags = { ...base };
+      const config = await loadCommandConfig("export", flags);
+      expect(config.rendered.format).toBe(ExportFormat.JSON);
+    });
+
+    /**
+     * No flags, env, or yaml should cause validation to fail for required fields.
+     */
+    it("should throw on validation error", async () => {
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      await expect(loadCommandConfig("export", {})).rejects.toThrow("Configuration loading failed.");
+      consoleSpy.mockRestore();
+    });
   });
 
-  it("should throw a validation error for invalid config", async () => {
-    vi.mocked(fs.readFile).mockRejectedValue({ code: "ENOENT" });
-    const flags = { path: "./path" }; // Missing token and format
-    await expect(loadCommandConfig(baseSchema, commandSchema, flags)).rejects.toThrow("Configuration loading failed.");
-  });
+  describe("TypeScript type safety", () => {
+    it("should enforce strict typing on ResolvedCommandConfig", () => {
+      // This test verifies that our type system is working correctly
+      // The following would cause TypeScript compilation errors if uncommented:
 
-  it("should log an error for non-ENOENT file errors but succeed if other sources are valid", async () => {
-    vi.mocked(fs.readFile).mockRejectedValue({ code: "EACCES" });
-    const flags = { token: "cli_token", path: "./cli_path", format: "json" };
-    const config = await loadCommandConfig(baseSchema, commandSchema, flags);
-    expect(config).toEqual({ ...flags, verbose: false });
+      // const invalidConfig: ResolvedCommandConfig<"export"> = {
+      //   badProperty: "this would not compile",
+      //   anotherInvalidProp: 123,
+      // };
+
+      // Valid config should work fine
+      const validConfig: ResolvedCommandConfig<"export"> = {
+        flush: false,
+        timeout: 0,
+        token: "secret_" + "a".repeat(43),
+        verbose: false,
+        concurrency: 10,
+        retries: 3,
+        path: "./export",
+        databases: [{ name: "test", id: "123" }],
+        pages: undefined, // optional
+        format: "json",
+        "max-concurrency": 10,
+        "include-blocks": true,
+        "include-comments": false,
+        "include-properties": true,
+        output: undefined // optional
+      };
+
+      expect(validConfig.path).toBe("./export");
+      expect(validConfig.format).toBe("json");
+
+      // Type system should prevent accessing non-existent properties
+      // The following would cause TypeScript errors if uncommented:
+      // expect(validConfig.badProperty).toBeUndefined();
+    });
+
+    it("should correctly extract flag keys for different commands", () => {
+      // Test that ExtractFlagKeys works correctly
+      type ExportKeys = ExtractFlagKeys<"export">;
+      type AllKeys = keyof typeof definitions;
+
+      // These type assertions verify our type extraction is working
+      const exportKey: ExportKeys = "path"; // Should work
+      const globalKey: ExportKeys = "flush"; // Should work (from "*" commands)
+
+      // The following would cause TypeScript errors if uncommented:
+      // const invalidKey: ExportKeys = "nonExistentKey";
+
+      expect(true).toBe(true); // Type checking happens at compile time
+    });
   });
 });

@@ -1,35 +1,35 @@
 /**
  * JSON File Writer
- * 
+ *
  * Writes Notion objects to structured JSON files
  */
 
-import { BaseFileWriter } from '../base-writer';
-import { FileWriteResult, JsonFormatOptions } from '../types';
-import { NotionBlock, NotionDatabase, NotionPage } from '../../../shared/types';
+import { NotionBlock, NotionDatabase, NotionPage } from "../../../lib/notion/types";
+import { BaseFileWriter } from "../base-writer";
+import { FileWriteResult, JsonFormatOptions } from "../types";
 
 export class JSONWriter extends BaseFileWriter {
   private formatOptions: JsonFormatOptions;
 
   constructor(config: any, eventPublisher?: (event: any) => Promise<void>, formatOptions?: JsonFormatOptions) {
     super(config, eventPublisher);
-    
+
     this.formatOptions = {
       pretty: true,
       includeMetadata: true,
       includeBlocks: true,
       includeProperties: true,
-      dateFormat: 'iso',
+      dateFormat: "iso",
       ...formatOptions
     };
   }
 
   getFileExtension(): string {
-    return '.json';
+    return ".json";
   }
 
   getMimeType(): string {
-    return 'application/json';
+    return "application/json";
   }
 
   /**
@@ -38,7 +38,7 @@ export class JSONWriter extends BaseFileWriter {
   async writeDatabase(database: NotionDatabase, outputPath: string): Promise<FileWriteResult> {
     const filename = this.generateFilename(database);
     const filePath = this.getFullFilePath(outputPath, filename);
-    
+
     const jsonData = this.formatDatabaseData(database);
     return this.writeRawData(jsonData, filePath);
   }
@@ -49,7 +49,7 @@ export class JSONWriter extends BaseFileWriter {
   async writePage(page: NotionPage, outputPath: string): Promise<FileWriteResult> {
     const filename = this.generateFilename(page);
     const filePath = this.getFullFilePath(outputPath, filename);
-    
+
     const jsonData = this.formatPageData(page);
     return this.writeRawData(jsonData, filePath);
   }
@@ -60,7 +60,7 @@ export class JSONWriter extends BaseFileWriter {
   async writeBlocks(blocks: NotionBlock[], outputPath: string): Promise<FileWriteResult> {
     const filename = `blocks_${Date.now()}`;
     const filePath = this.getFullFilePath(outputPath, filename);
-    
+
     const jsonData = this.formatBlocksData(blocks);
     return this.writeRawData(jsonData, filePath);
   }
@@ -81,7 +81,7 @@ export class JSONWriter extends BaseFileWriter {
   private formatDatabaseData(database: NotionDatabase): any {
     const data: any = {
       id: database.id,
-      type: 'database',
+      type: "database",
       title: database.title,
       description: database.description,
       url: database.url,
@@ -111,7 +111,7 @@ export class JSONWriter extends BaseFileWriter {
   private formatPageData(page: NotionPage): any {
     const data: any = {
       id: page.id,
-      type: 'page',
+      type: "page",
       title: page.title,
       url: page.url,
       archived: page.archived
@@ -139,9 +139,9 @@ export class JSONWriter extends BaseFileWriter {
    */
   private formatBlocksData(blocks: NotionBlock[]): any {
     return {
-      type: 'blocks',
+      type: "blocks",
       count: blocks.length,
-      blocks: blocks.map(block => this.formatBlockData(block))
+      blocks: blocks.map((block) => this.formatBlockData(block))
     };
   }
 
@@ -177,30 +177,30 @@ export class JSONWriter extends BaseFileWriter {
    */
   private formatBlockContent(content: any, blockType: string): any {
     switch (blockType) {
-      case 'paragraph':
+      case "paragraph":
         return {
           richText: content.rich_text || [],
           color: content.color
         };
 
-      case 'heading_1':
-      case 'heading_2':
-      case 'heading_3':
+      case "heading_1":
+      case "heading_2":
+      case "heading_3":
         return {
           richText: content.rich_text || [],
           color: content.color,
           isToggleable: content.is_toggleable || false
         };
 
-      case 'bulleted_list_item':
-      case 'numbered_list_item':
+      case "bulleted_list_item":
+      case "numbered_list_item":
         return {
           richText: content.rich_text || [],
           color: content.color,
           children: content.children || []
         };
 
-      case 'to_do':
+      case "to_do":
         return {
           richText: content.rich_text || [],
           checked: content.checked || false,
@@ -208,28 +208,28 @@ export class JSONWriter extends BaseFileWriter {
           children: content.children || []
         };
 
-      case 'toggle':
+      case "toggle":
         return {
           richText: content.rich_text || [],
           color: content.color,
           children: content.children || []
         };
 
-      case 'code':
+      case "code":
         return {
           richText: content.rich_text || [],
-          language: content.language || 'plain text',
+          language: content.language || "plain text",
           caption: content.caption || []
         };
 
-      case 'quote':
+      case "quote":
         return {
           richText: content.rich_text || [],
           color: content.color,
           children: content.children || []
         };
 
-      case 'callout':
+      case "callout":
         return {
           richText: content.rich_text || [],
           icon: content.icon,
@@ -237,32 +237,32 @@ export class JSONWriter extends BaseFileWriter {
           children: content.children || []
         };
 
-      case 'divider':
+      case "divider":
         return {};
 
-      case 'image':
-      case 'video':
-      case 'file':
-      case 'pdf':
+      case "image":
+      case "video":
+      case "file":
+      case "pdf":
         return {
           type: content.type,
           url: content[content.type]?.url,
           caption: content.caption || []
         };
 
-      case 'bookmark':
+      case "bookmark":
         return {
           url: content.url,
           caption: content.caption || []
         };
 
-      case 'embed':
+      case "embed":
         return {
           url: content.url,
           caption: content.caption || []
         };
 
-      case 'table':
+      case "table":
         return {
           tableWidth: content.table_width,
           hasColumnHeader: content.has_column_header,
@@ -270,48 +270,48 @@ export class JSONWriter extends BaseFileWriter {
           children: content.children || []
         };
 
-      case 'table_row':
+      case "table_row":
         return {
           cells: content.cells || []
         };
 
-      case 'equation':
+      case "equation":
         return {
           expression: content.expression
         };
 
-      case 'breadcrumb':
+      case "breadcrumb":
         return {};
 
-      case 'table_of_contents':
+      case "table_of_contents":
         return {
           color: content.color
         };
 
-      case 'column_list':
-      case 'column':
+      case "column_list":
+      case "column":
         return {
           children: content.children || []
         };
 
-      case 'link_preview':
+      case "link_preview":
         return {
           url: content.url
         };
 
-      case 'synced_block':
+      case "synced_block":
         return {
           syncedFrom: content.synced_from,
           children: content.children || []
         };
 
-      case 'template':
+      case "template":
         return {
           richText: content.rich_text || [],
           children: content.children || []
         };
 
-      case 'link_to_page':
+      case "link_to_page":
         return {
           type: content.type,
           pageId: content.page_id,
@@ -352,27 +352,27 @@ export class JSONWriter extends BaseFileWriter {
 
     // Add type-specific configuration
     switch (property.type) {
-      case 'title':
-      case 'rich_text':
+      case "title":
+      case "rich_text":
         formatted.richText = property[property.type] || [];
         break;
 
-      case 'number':
+      case "number":
         formatted.number = property.number;
         formatted.format = property.number?.format;
         break;
 
-      case 'select':
+      case "select":
         formatted.select = property.select;
         formatted.options = property.select?.options || [];
         break;
 
-      case 'multi_select':
+      case "multi_select":
         formatted.multiSelect = property.multi_select;
         formatted.options = property.multi_select?.options || [];
         break;
 
-      case 'date':
+      case "date":
         formatted.date = property.date;
         if (property.date?.start) {
           formatted.date.start = this.formatDate(property.date.start, this.formatOptions.dateFormat);
@@ -382,55 +382,55 @@ export class JSONWriter extends BaseFileWriter {
         }
         break;
 
-      case 'people':
+      case "people":
         formatted.people = property.people || [];
         break;
 
-      case 'files':
+      case "files":
         formatted.files = property.files || [];
         break;
 
-      case 'checkbox':
+      case "checkbox":
         formatted.checkbox = property.checkbox;
         break;
 
-      case 'url':
+      case "url":
         formatted.url = property.url;
         break;
 
-      case 'email':
+      case "email":
         formatted.email = property.email;
         break;
 
-      case 'phone_number':
+      case "phone_number":
         formatted.phoneNumber = property.phone_number;
         break;
 
-      case 'formula':
+      case "formula":
         formatted.formula = property.formula;
         break;
 
-      case 'relation':
+      case "relation":
         formatted.relation = property.relation;
         break;
 
-      case 'rollup':
+      case "rollup":
         formatted.rollup = property.rollup;
         break;
 
-      case 'created_time':
+      case "created_time":
         formatted.createdTime = this.formatDate(property.created_time, this.formatOptions.dateFormat);
         break;
 
-      case 'created_by':
+      case "created_by":
         formatted.createdBy = property.created_by;
         break;
 
-      case 'last_edited_time':
+      case "last_edited_time":
         formatted.lastEditedTime = this.formatDate(property.last_edited_time, this.formatOptions.dateFormat);
         break;
 
-      case 'last_edited_by':
+      case "last_edited_by":
         formatted.lastEditedBy = property.last_edited_by;
         break;
 

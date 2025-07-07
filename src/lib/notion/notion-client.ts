@@ -15,11 +15,12 @@
 
 import { Client } from "@notionhq/client";
 import { PropertyItemListResponse, PropertyItemObjectResponse } from "@notionhq/client/build/src/api-endpoints";
+import { NotionConfig, RateLimitInfo } from "src/shared/types";
 import { ErrorFactory, NotionApiError, RateLimitError } from "../../shared/errors/index";
+import { log } from "../log";
 import {
   NotionBlock,
   NotionComment,
-  NotionConfig,
   NotionDatabase,
   NotionObjectType,
   NotionPage,
@@ -27,10 +28,8 @@ import {
   NotionPropertyItem,
   NotionUser,
   NotionWorkspace,
-  PropertyItemType,
-  RateLimitInfo
-} from "../../shared/types/index";
-import { log } from "../log";
+  PropertyItemType
+} from "./types";
 
 export interface NotionApiClient {
   getPage(pageId: string): Promise<NotionPage>;

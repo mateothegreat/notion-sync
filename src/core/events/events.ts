@@ -4,7 +4,7 @@
  * Events that represent business-significant occurrences
  */
 
-import { DomainEvent, ErrorInfo, ProgressInfo } from "../../shared/types";
+import { DomainEvent, DomainEventMetadata, ErrorInfo, ProgressInfo } from "../../shared/types";
 
 // Base event factory
 export function createDomainEvent(
@@ -12,7 +12,7 @@ export function createDomainEvent(
   aggregateId: string,
   aggregateType: string,
   payload: Record<string, any>,
-  metadata?: Record<string, any>
+  metadata?: DomainEventMetadata
 ): DomainEvent {
   return {
     id: crypto.randomUUID(),
@@ -299,14 +299,16 @@ export const ProgressEvents = {
     section: string,
     itemsProcessed: number,
     duration: number,
-    errors: ErrorInfo[]
+    errors: ErrorInfo[],
+    metadata?: DomainEventMetadata
   ): ProgressSectionCompletedEvent =>
     createDomainEvent("progress.section.completed", exportId, "Progress", {
       exportId,
       section,
       itemsProcessed,
       duration,
-      errors
+      errors,
+      metadata
     }) as ProgressSectionCompletedEvent,
 
   itemProcessed: (

@@ -4,10 +4,11 @@
  * Organizes exported files in a logical directory structure
  */
 
+import { ExportFormat } from "$lib/exporters/exporter";
+import { NotionDatabase, NotionPage } from "$lib/notion/types";
 import { promises as fs } from "fs";
 import path from "path";
-import { ExportFormat, NotionDatabase, NotionPage } from "../../../shared/types";
-import { DirectoryOrganizer, FileSystemConfig } from "../types";
+import { DirectoryOrganizer, FileSystemConfig } from "../../infrastructure/filesystem/types";
 
 export class WorkspaceOrganizer implements DirectoryOrganizer {
   private config: FileSystemConfig;
@@ -262,8 +263,6 @@ export class WorkspaceOrganizer implements DirectoryOrganizer {
         return ".md";
       case ExportFormat.HTML:
         return ".html";
-      case ExportFormat.CSV:
-        return ".csv";
       default:
         return ".txt";
     }
