@@ -36,3 +36,27 @@ GET {{baseUrl}}/pages/{{pageId}}
     equal(response.parsedBody.object, 'page');
   });
 }}
+
+
+HTTP/1.1 200  - OK
+date: Mon, 07 Jul 2025 07:11:54 GMT
+content-type: application/json; charset=utf-8
+transfer-encoding: chunked
+connection: close
+cf-ray: 95b587cdaf403ab9-DFW
+cf-cache-status: DYNAMIC
+content-encoding: gzip
+etag: W/"11aa-kTfon221SoVzd6sAmtf9eGeTpFE"
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+vary: Accept-Encoding
+content-security-policy: default-src 'none'
+referrer-policy: strict-origin-when-cross-origin
+x-content-type-options: nosniff
+x-dns-prefetch-control: off
+x-download-options: noopen
+x-frame-options: SAMEORIGIN
+x-notion-request-id: 3402b76f-d198-4f4a-aea1-57721d8720c7
+x-permitted-cross-domain-policies: none
+x-xss-protection: 0
+server: cloudflare
+alt-svc: h3=":443"; ma=86400
