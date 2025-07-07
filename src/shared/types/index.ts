@@ -127,7 +127,9 @@ export enum NotionObjectType {
   DATABASE = "database",
   BLOCK = "block",
   USER = "user",
-  COMMENT = "comment"
+  COMMENT = "comment",
+  PROPERTY = "property",
+  WORKSPACE = "workspace"
 }
 
 export interface NotionUser {
@@ -266,4 +268,23 @@ export interface FileSystemConfig {
   organizationStrategy: "flat" | "hierarchical" | "by-type" | "by-date";
   encoding: "utf8" | "utf16le" | "ascii";
   enableChecksums: boolean;
+}
+
+export interface NotionComment extends NotionObject {
+  type: NotionObjectType.COMMENT;
+  parent: NotionParent;
+  rich_text: any[];
+}
+
+export interface NotionPropertyItem {
+  id: string;
+  type: string;
+  value: any;
+}
+
+export interface NotionWorkspace {
+  id: string;
+  name: string;
+  owner: string;
+  createdTime: string;
 }

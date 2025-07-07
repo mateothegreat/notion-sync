@@ -11,10 +11,14 @@ import { log } from "../../lib/log";
 import { ErrorFactory, NotionApiError, RateLimitError } from "../../shared/errors/index";
 import {
   NotionBlock,
+  NotionComment,
   NotionConfig,
   NotionDatabase,
   NotionObjectType,
   NotionPage,
+  NotionProperty,
+  NotionPropertyItem,
+  NotionWorkspace,
   RateLimitInfo
 } from "../../shared/types/index";
 
@@ -27,9 +31,15 @@ export interface NotionApiClient {
     options?: any
   ): Promise<{ results: NotionPage[]; hasMore: boolean; nextCursor?: string }>;
   getBlocks(blockId: string): Promise<{ results: NotionBlock[]; hasMore: boolean; nextCursor?: string }>;
-  getUsers(): Promise<any[]>;
+  getUsers(): Promise<NotionUser[]>;
   search(query: string, options?: any): Promise<any>;
   getRateLimitInfo(): RateLimitInfo | null;
+  getComments(blockId: string): Promise<NotionComment[]>;
+  getPropertyItem(pageId: string, propertyId: string): Promise<NotionPropertyItem>;
+  getWorkspace(): Promise<NotionWorkspace>;
+  getDatabaseProperties(databaseId: string): Promise<NotionProperty[]>;
+  getPageProperties(pageId: string): Promise<NotionProperty[]>;
+  getBlockChildren(blockId: string): Promise<NotionBlock[]>;
 }
 
 export class NotionClient implements NotionApiClient {
@@ -106,10 +116,10 @@ export class NotionClient implements NotionApiClient {
     });
   }
 
-  async getUsers(): Promise<any[]> {
+  async getUsers(): Promise<NotionUser[]> {
     return this.execute("users.list", async () => {
       const response = await this.client.users.list({});
-      return response.results;
+      return response.results.map((user) => this.transformUser(user));
     });
   }
 
@@ -124,6 +134,101 @@ export class NotionClient implements NotionApiClient {
 
   getRateLimitInfo(): RateLimitInfo | null {
     return this.rateLimitInfo;
+  }
+
+  /**
+   * Get comments for a specific block or page.
+   *
+   * @param {string} blockId - The ID of the block or page.
+   * @returns {Promise<NotionComment[]>} - Array of comments.
+   */
+  async getComments(blockId: string): Promise<NotionComment[]> {
+    return this.execute(`comments.list for ${blockId}`, async () => {
+      const response = await this.client.comments.list({ block_id: blockId });
+      return response.results.map((comment) => this.transformComment(comment));
+    });
+  }
+
+  /**
+   * Get property item value for a specific page.
+   *
+   * @param {string} pageId - The ID of the page.
+   * @param {string} propertyId - The ID of the property.
+   * @returns {Promise<NotionPropertyItem>} - The property value.
+   */
+  async getPropertyItem(pageId: string, propertyId: string): Promise<NotionPropertyItem> {
+    return this.execute(`pages.properties.retrieve for ${pageId}/${propertyId}`, () =>
+      this.client.pages.properties.retrieve({
+        page_id: pageId,
+        property_id: propertyId
+      })
+    );
+  }
+
+  /**
+   * Get all properties for a specific database.
+   *
+   * @param {string} databaseId - The ID of the database.
+   * @returns {Promise<NotionProperty[]>} - Array of database properties.
+   */
+  async getDatabaseProperties(databaseId: string): Promise<NotionProperty[]> {
+    return this.execute(`databases.properties.retrieve for ${databaseId}`, async () => {
+      const database = await this.getDatabase(databaseId);
+      return Object.entries(database.properties).map(([name, property]) => ({
+        id: property.id,
+        name,
+        type: property.type,
+        ...property
+      }));
+    });
+  }
+
+  /**
+   * Get all properties for a specific page.
+   *
+   * @param {string} pageId - The ID of the page.
+   * @returns {Promise<NotionProperty[]>} - Array of page properties.
+   */
+  async getPageProperties(pageId: string): Promise<NotionProperty[]> {
+    return this.execute(`pages.properties.retrieve for ${pageId}`, async () => {
+      const page = await this.getPage(pageId);
+      return Object.entries(page.properties).map(([name, property]) => ({
+        id: property.id,
+        name,
+        type: property.type,
+        ...property
+      }));
+    });
+  }
+
+  /**
+   * Get child blocks for a specific block.
+   *
+   * @param {string} blockId - The ID of the parent block.
+   * @returns {Promise<NotionBlock[]>} - Array of child blocks.
+   */
+  async getBlockChildren(blockId: string): Promise<NotionBlock[]> {
+    return this.execute(`blocks.children.list for ${blockId}`, async () => {
+      const response = await this.client.blocks.children.list({ block_id: blockId });
+      return response.results.map((block) => this.transformBlock(block));
+    });
+  }
+
+  /**
+   * Get workspace information.
+   *
+   * @returns {Promise<NotionWorkspace>} - Workspace metadata.
+   */
+  async getWorkspace(): Promise<NotionWorkspace> {
+    return this.execute("workspace.retrieve", async () => {
+      const response = await this.client.users.me({});
+      return {
+        id: response.bot?.owner.workspace ? response.bot.owner.workspace : "personal",
+        name: response.name || "Personal Workspace",
+        owner: response.bot?.owner.user ? response.bot.owner.user : response.id,
+        createdTime: new Date().toISOString()
+      };
+    });
   }
 
   private async execute<T>(operation: string, fn: () => Promise<T>): Promise<T> {
@@ -232,6 +337,29 @@ export class NotionClient implements NotionApiClient {
       lastEditedTime: notionBlock.last_edited_time,
       createdBy: notionBlock.created_by,
       lastEditedBy: notionBlock.last_edited_by
+    };
+  }
+
+  private transformUser(notionUser: any): NotionUser {
+    return {
+      id: notionUser.id,
+      type: NotionObjectType.USER,
+      name: notionUser.name || "",
+      avatar_url: notionUser.avatar_url || "",
+      object: "user"
+    };
+  }
+
+  private transformComment(notionComment: any): NotionComment {
+    return {
+      id: notionComment.id,
+      type: NotionObjectType.COMMENT,
+      parent: notionComment.parent,
+      rich_text: notionComment.rich_text,
+      createdTime: notionComment.created_time,
+      lastEditedTime: notionComment.last_edited_time,
+      createdBy: notionComment.created_by,
+      lastEditedBy: notionComment.last_edited_by
     };
   }
 

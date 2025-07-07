@@ -334,6 +334,12 @@ export default class Export extends BaseCommand<typeof Export> {
     this.log("🚀 Starting export...");
     await this.exportService.startExport(export_.id);
 
+    // Export workspace metadata
+    await this.exportWorkspaceMetadata(export_.id, configuration.outputPath);
+
+    // Export users
+    await this.exportUsers(export_.id, configuration.outputPath);
+
     /**
      * Process databases.
      * This is used to process the databases for export.
@@ -428,6 +434,15 @@ export default class Export extends BaseCommand<typeof Export> {
 
         this.log(`📊 Database ${database.title || databaseId}: exported metadata + ${pageCount} pages`);
         await this.progressService.updateSectionProgress(exportId, "databases", 1);
+
+        // Export database properties
+        const properties = await this.notionClient.getDatabaseProperties(databaseId);
+        if (properties.length > 0) {
+          await this.fileSystemManager.writeRawData(
+            properties,
+            `${configuration.outputPath}/properties/${databaseId}-properties.json`
+          );
+        }
       } catch (error) {
         const errorInfo = {
           id: crypto.randomUUID(),
@@ -458,6 +473,30 @@ export default class Export extends BaseCommand<typeof Export> {
 
         // Write page to output
         await this.writeToOutput(page, "page");
+
+        // Export comments
+        const comments = await this.notionClient.getComments(pageId);
+        if (comments.length > 0) {
+          await this.fileSystemManager.writeRawData(
+            comments,
+            `${configuration.outputPath}/comments/${pageId}-comments.json`
+          );
+        }
+
+        // Export properties
+        const properties = await this.notionClient.getPageProperties(pageId);
+        if (properties.length > 0) {
+          await this.fileSystemManager.writeRawData(
+            properties,
+            `${configuration.outputPath}/properties/${pageId}-properties.json`
+          );
+        }
+
+        // Export block children
+        const blocks = await this.notionClient.getBlocks(pageId);
+        if (blocks.length > 0) {
+          await this.fileSystemManager.writeRawData(blocks, `${configuration.outputPath}/blocks/${pageId}-blocks.json`);
+        }
 
         await this.progressService.updateSectionProgress(exportId, "pages", 1);
       } catch (error) {
@@ -542,5 +581,23 @@ export default class Export extends BaseCommand<typeof Export> {
         return all.slice(start, end);
       }
     };
+  }
+
+  private async exportWorkspaceMetadata(exportId: string, outputPath: string): Promise<void> {
+    try {
+      const workspace = await this.notionClient.getWorkspace();
+      await this.fileSystemManager.writeRawData(workspace, `${outputPath}/workspace.json`);
+    } catch (error) {
+      this.handleExportError(exportId, "workspace", undefined, error);
+    }
+  }
+
+  private async exportUsers(exportId: string, outputPath: string): Promise<void> {
+    try {
+      const users = await this.notionClient.getUsers();
+      await this.fileSystemManager.writeRawData(users, `${outputPath}/users.json`);
+    } catch (error) {
+      this.handleExportError(exportId, "users", undefined, error);
+    }
   }
 }
