@@ -36,27 +36,3 @@ GET {{baseUrl}}/pages/{{pageId}}
     equal(response.parsedBody.object, 'page');
   });
 }}
-
-
-HTTP/1.1 200  - OK
-date: Mon, 07 Jul 2025 07:02:46 GMT
-content-type: application/json; charset=utf-8
-transfer-encoding: chunked
-connection: close
-cf-ray: 95b57a6bcdb86bf6-DFW
-cf-cache-status: DYNAMIC
-content-encoding: gzip
-etag: W/"11a8-0kc3RuNg/EaiMH3+GpzVU5T3tKo"
-strict-transport-security: max-age=31536000; includeSubDomains; preload
-vary: Accept-Encoding
-content-security-policy: default-src 'none'
-referrer-policy: strict-origin-when-cross-origin
-x-content-type-options: nosniff
-x-dns-prefetch-control: off
-x-download-options: noopen
-x-frame-options: SAMEORIGIN
-x-notion-request-id: 888e0d58-b5e8-486f-ba8d-68ef815270a1
-x-permitted-cross-domain-policies: none
-x-xss-protection: 0
-server: cloudflare
-alt-svc: h3=":443"; ma=86400

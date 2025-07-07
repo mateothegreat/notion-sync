@@ -49,7 +49,7 @@
     "dirname": "notion-sync",
     "helpClass": "./dist/lib/commands/help",
     "topicSeparator": " ",
-    "theme": "./theme.json",
+    "theme": "./settings/cli-theme.json",
     "hooks": {
       "init": [
         "./dist/hooks/init"
