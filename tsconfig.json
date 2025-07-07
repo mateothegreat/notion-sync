@@ -4,8 +4,8 @@
     "baseUrl": ".",
     "rootDir": "./src",
     "outDir": "./dist",
-    "module": "esnext",
-    "moduleResolution": "node",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
     "noEmit": true,
     "verbatimModuleSyntax": false,
     "skipLibCheck": true,
@@ -18,7 +18,8 @@
     "paths": {
       "$lib/*": ["src/lib/*"],
       "$lib": ["src/lib/index.ts"],
-      "$core/*": ["src/core/*"]
+      "$core/*": ["src/core/*"],
+      "rollup/*": ["node_modules/rollup/dist/*"]
     }
   },
   "include": ["./src/**/*", "vitest-env.d.ts"],
