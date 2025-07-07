@@ -1,6 +1,7 @@
 import { Command, Flags } from "@oclif/core";
 import * as fs from "fs/promises";
-import { createCommandFlags, generateConfigYaml } from "../../lib/config/config-loader";
+import { getCommandFlags } from "../../lib/config/simple-config";
+import { generateConfigYaml } from "../../lib/config/config-loader";
 
 export default class Init extends Command {
   static override description = "Initialize a new Notion Sync project configuration file";
@@ -11,11 +12,10 @@ export default class Init extends Command {
   ];
 
   /**
-   * Export-specific flags extracted dynamically based on command name.
-   * This automatically includes all global flags (*) and export-specific flags.
+   * Init command doesn't need the full configuration system,
+   * just basic flags for generating the config file.
    */
   static override flags = {
-    ...createCommandFlags("init"),
     full: Flags.boolean({
       description: "Generate a full configuration file with all available options",
       default: false,
@@ -39,41 +39,33 @@ export default class Init extends Command {
   };
 
   public async run(): Promise<void> {
-    const { flags } = await this.parse(Init);
+    const { args, flags } = await this.parse(Init);
 
-    // Check if file already exists
     try {
-      await fs.access(flags.output);
+      // Check if file exists
       if (!flags.force) {
-        this.error(`Configuration file already exists at ${flags.output}. Use --force to overwrite.`);
+        try {
+          await fs.access(flags.output);
+          this.error(`Configuration file already exists at ${flags.output}. Use --force to overwrite.`);
+        } catch {
+          // File doesn't exist, we can proceed
+        }
       }
-    } catch {
-      // File doesn't exist, which is what we want
-    }
 
-    this.log(`Initializing Notion Sync configuration file...`);
+      // For now, generate using the old system
+      // TODO: Create a new config generator that uses the simple-config system
+      await generateConfigYaml(flags.output, flags.full);
 
-    try {
-      if (flags.full) {
-        await generateConfigYaml(flags.output, true);
-        this.log(`✅ Full configuration file created at: ${flags.output}`);
-        this.log(`\nNext steps:`);
-        this.log(`1. Edit ${flags.output} and add your Notion integration token`);
-        this.log(`2. Add your database and page IDs`);
-        this.log(`3. Customize any other settings as needed`);
-        this.log(`4. Run 'notion-sync export' to start exporting your Notion data`);
-      } else {
-        await generateConfigYaml(flags.output);
-        this.log(`✅ Minimal configuration file created at: ${flags.output}`);
-        this.log(`\nNext steps:`);
-        this.log(`1. Edit ${flags.output} and replace the placeholder values:`);
-        this.log(`   - Add your Notion integration token`);
-        this.log(`   - Add your database ID(s)`);
-        this.log(`2. Run 'notion-sync export' to start exporting your Notion data`);
-        this.log(`\nFor more configuration options, run: notion-sync config init --full`);
-      }
+      this.log(`✅ Configuration file created at: ${flags.output}`);
+      this.log("\nNext steps:");
+      this.log("1. Edit the configuration file with your Notion API token");
+      this.log("2. Run 'notion-sync export' to start exporting your Notion content");
     } catch (error) {
-      this.error(`Failed to create configuration file: ${error instanceof Error ? error.message : error}`);
+      if (error instanceof Error) {
+        this.error(`Failed to create configuration file: ${error.message}`);
+      } else {
+        this.error("Failed to create configuration file");
+      }
     }
   }
 }

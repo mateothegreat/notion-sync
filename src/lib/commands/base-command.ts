@@ -1,6 +1,5 @@
-import { createCommandFlags } from "$lib/config/config-loader";
 import { Command, Interfaces } from "@oclif/core";
-import { Flag } from "@oclif/core/lib/interfaces";
+import { baseFlags } from "../config/simple-config";
 
 export type Flags<T extends typeof Command> = Interfaces.InferredFlags<(typeof BaseCommand)["baseFlags"] & T["flags"]>;
 export type Args<T extends typeof Command> = Interfaces.InferredArgs<T["args"]>;
@@ -10,9 +9,9 @@ export abstract class BaseCommand<T extends typeof Command> extends Command {
 
   /**
    * Base flags available to all commands (global flags).
-   * These are automatically extracted from parseables for commands marked with "*".
+   * These are the core properties shared by all commands.
    */
-  static baseFlags: Record<string, Flag<any>> = createCommandFlags("*");
+  static baseFlags = baseFlags;
 
   protected flags!: Flags<T>;
   protected args!: Args<T>;
