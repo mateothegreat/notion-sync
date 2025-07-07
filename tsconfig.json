@@ -4,11 +4,10 @@
     "baseUrl": ".",
     "rootDir": "./src",
     "outDir": "./dist",
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
+    "module": "esnext",
+    "moduleResolution": "node",
     "noEmit": true,
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
+    "verbatimModuleSyntax": false,
     "types": ["node", "vitest"],
     "strict": true,
     "strictNullChecks": false,
@@ -17,6 +16,7 @@
     "esModuleInterop": true,
     "paths": {
       "$lib/*": ["src/lib/*"],
+      "$lib": ["src/lib/index.ts"],
       "$core/*": ["src/core/*"]
     }
   },
