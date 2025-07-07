@@ -12,8 +12,8 @@ import { inspect } from "util";
 import { compileConfig, Config, config as configLoaded, createCommandFlags } from "$lib/config-loader";
 import { ExportService } from "../core/services/export-service";
 import { ProgressService } from "../core/services/progress-service";
-import { NotionClient } from "../infrastructure/notion/notion-client";
 import { FileSystemManager } from "../infrastructure/filesystem/file-system-manager";
+import { NotionClient } from "../infrastructure/notion/notion-client";
 import { BaseCommand } from "../lib/commands/base-command";
 import { ControlPlane, createControlPlane } from "../lib/control-plane/control-plane";
 import { ExportConfiguration, ExportFormat, NotionConfig } from "../shared/types";
@@ -364,15 +364,69 @@ export default class Export extends BaseCommand<typeof Export> {
   private async processDatabases(exportId: string, databaseIds: string[]): Promise<void> {
     if (!this.notionClient || !this.progressService) return;
 
-    await this.progressService.startSection(exportId, "databases", databaseIds.length);
+    // First, get total count of databases + estimate pages for progress tracking
+    let totalItems = databaseIds.length;
+    const databasePageCounts: { [databaseId: string]: number } = {};
+
+    // Get a rough estimate of total pages for better progress tracking
+    for (const databaseId of databaseIds) {
+      try {
+        // Query first page to get an idea of total pages
+        const firstQuery = await this.notionClient.queryDatabase(databaseId, { page_size: 1 });
+        // For now, we'll just count what we can see, but in a real implementation
+        // you might want to paginate through all results to get exact count
+        databasePageCounts[databaseId] = 0; // We'll count as we go
+      } catch (error) {
+        databasePageCounts[databaseId] = 0;
+      }
+    }
+
+    await this.progressService.startSection(exportId, "databases", totalItems);
 
     for (const databaseId of databaseIds) {
       try {
+        // 1. First export the database metadata
         const database = await this.notionClient.getDatabase(databaseId);
-
-        // Write database to output.
         await this.writeToOutput(database, "database");
 
+        // 2. Then export all pages in the database
+        let hasMore = true;
+        let nextCursor: string | undefined = undefined;
+        let pageCount = 0;
+
+        while (hasMore) {
+          try {
+            const queryResult = await this.notionClient.queryDatabase(databaseId, {
+              start_cursor: nextCursor,
+              page_size: 100 // Process in batches of 100
+            });
+
+            // Export each page
+            for (const page of queryResult.results) {
+              await this.writeToOutput(page, "page");
+              pageCount++;
+            }
+
+            hasMore = queryResult.hasMore;
+            nextCursor = queryResult.nextCursor;
+
+            // Update progress with page count
+            if (queryResult.results.length > 0) {
+              this.log(
+                `📄 Exported ${queryResult.results.length} pages from database: ${database.title || databaseId}`
+              );
+            }
+          } catch (pageError) {
+            this.log(
+              `⚠️ Failed to query pages from database ${databaseId}: ${
+                pageError instanceof Error ? pageError.message : "Unknown error"
+              }`
+            );
+            break; // Stop processing this database's pages but continue with the database
+          }
+        }
+
+        this.log(`📊 Database ${database.title || databaseId}: exported metadata + ${pageCount} pages`);
         await this.progressService.updateSectionProgress(exportId, "databases", 1);
       } catch (error) {
         const errorInfo = {
@@ -427,7 +481,7 @@ export default class Export extends BaseCommand<typeof Export> {
    */
   private async writeToOutput(data: any, type: string): Promise<void> {
     if (!this.fileSystemManager) {
-      throw new Error('File system manager not initialized');
+      throw new Error("File system manager not initialized");
     }
 
     try {
@@ -435,21 +489,21 @@ export default class Export extends BaseCommand<typeof Export> {
       let filePath: string;
 
       switch (type) {
-        case 'database':
+        case "database":
           filePath = await this.fileSystemManager.writeDatabase(data, format);
           break;
-        
-        case 'page':
+
+        case "page":
           filePath = await this.fileSystemManager.writePage(data, format);
           break;
-        
+
         default:
           throw new Error(`Unknown data type: ${type}`);
       }
 
       this.log(`📄 Exported ${type}: ${data.id} → ${filePath}`);
     } catch (error) {
-      this.log(`❌ Failed to write ${type} ${data.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      this.log(`❌ Failed to write ${type} ${data.id}: ${error instanceof Error ? error.message : "Unknown error"}`);
       throw error;
     }
   }

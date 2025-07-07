@@ -38,6 +38,7 @@ graph TB
 Load configuration from multiple sources with validation.
 
 **Parameters:**
+
 - `options.configFile` - Path to configuration file
 - `options.envPrefix` - Environment variable prefix (default: 'NOTION_SYNC_')
 - `options.validate` - Enable validation (default: true)
@@ -46,6 +47,7 @@ Load configuration from multiple sources with validation.
 **Returns:** Complete application configuration
 
 **Example:**
+
 ```typescript
 import { loadConfig } from './config';
 
@@ -127,6 +129,7 @@ interface AppConfig {
 Create a new export with the specified configuration.
 
 **Parameters:**
+
 ```typescript
 interface ExportConfiguration {
   outputPath: string;
@@ -141,7 +144,16 @@ interface ExportConfiguration {
 
 **Returns:** Export domain object
 
+**Database Export Behavior:**
+When exporting databases, the system automatically:
+
+1. **Exports database metadata** (schema, properties, configuration)
+2. **Exports all pages within the database** (all rows/records)
+3. **Handles pagination** for large databases with 100+ pages
+4. **Provides detailed progress** showing both database and page counts
+
 **Example:**
+
 ```typescript
 const exportService = new ExportService(eventPublisher, notionClient);
 
@@ -151,13 +163,15 @@ const export_ = await exportService.createExport({
   includeBlocks: true,
   includeComments: true,
   includeProperties: true,
-  databases: ['database-id-1', 'database-id-2'],
-  pages: ['page-id-1']
+  databases: ['database-id-1', 'database-id-2'], // Exports both metadata AND all pages
+  pages: ['page-id-1'] // Additional standalone pages
 });
 
 // Start the export
 await exportService.startExport(export_.id);
 ```
+
+**Note:** When you specify databases in the configuration, you get both the database structure AND all the content within it. This ensures complete data export without manually specifying each individual page ID.
 
 #### `Export` Domain Model
 
@@ -178,6 +192,7 @@ The `Export` class represents the core business entity for exports.
 - `canBeRestarted(): boolean` - Check if export can be restarted
 
 **Events:**
+
 - `export.started` - Export has started
 - `export.completed` - Export completed successfully
 - `export.failed` - Export failed
@@ -203,6 +218,7 @@ Update progress for a section.
 Get current progress for an export.
 
 **Returns:**
+
 ```typescript
 interface ProgressUpdate {
   processed: number;
@@ -236,6 +252,7 @@ Get blocks from a page with pagination.
 All Notion client methods handle rate limiting, retries, and circuit breaker logic automatically.
 
 **Events:**
+
 - `notion.object.fetched` - Object successfully retrieved
 - `notion.rate_limit.hit` - Rate limit encountered
 - `notion.api.error` - API error occurred
@@ -251,6 +268,7 @@ Start performance monitoring and metrics collection.
 Measure execution time of a function.
 
 **Example:**
+
 ```typescript
 const monitor = getPerformanceMonitor();
 
@@ -268,6 +286,7 @@ console.log(`API call took ${duration}ms`);
 Get comprehensive export performance metrics.
 
 **Returns:**
+
 ```typescript
 interface ExportMetrics {
   totalApiCalls: number;
@@ -287,6 +306,7 @@ interface ExportMetrics {
 Automatically measure method execution time.
 
 **Example:**
+
 ```typescript
 class MyService {
   @measured('database_query')
@@ -314,6 +334,7 @@ Gracefully stop the control plane.
 The message bus enables loose coupling between components.
 
 **Publishing Events:**
+
 ```typescript
 await messageBus.publish('export.started', {
   exportId: 'export-123',
@@ -323,6 +344,7 @@ await messageBus.publish('export.started', {
 ```
 
 **Subscribing to Events:**
+
 ```typescript
 messageBus.subscribe('export.progress.updated', async (event) => {
   console.log(`Export ${event.payload.exportId}: ${event.payload.percentage}%`);
@@ -334,6 +356,7 @@ messageBus.subscribe('export.progress.updated', async (event) => {
 Automatic fault tolerance for external dependencies.
 
 **Configuration:**
+
 ```typescript
 interface CircuitBreakerConfig {
   failureThreshold: number;    // Number of failures before opening
@@ -343,6 +366,7 @@ interface CircuitBreakerConfig {
 ```
 
 **States:**
+
 - `closed` - Normal operation
 - `open` - Failing, rejecting calls
 - `half-open` - Testing if service recovered
@@ -617,22 +641,26 @@ spec:
 ### Common Issues
 
 **Rate Limit Errors**
+
 - Reduce `maxConcurrency` setting
 - Increase delays between requests
 - Check API quota and limits
 
 **Memory Issues**
+
 - Reduce `chunkSize` in configuration
 - Enable garbage collection monitoring
 - Check for memory leaks in custom code
 
 **Export Failures**
+
 - Check API key permissions
 - Verify network connectivity
 - Review error logs for specific issues
 - Check if objects still exist in Notion
 
 **Performance Issues**
+
 - Enable performance monitoring
 - Check concurrency settings
 - Review rate limiting configuration
@@ -668,4 +696,4 @@ For issues and questions:
 1. Check the troubleshooting section
 2. Review error logs and metrics
 3. Enable debug mode for detailed logging
-4. Create GitHub issue with reproduction steps 
+4. Create GitHub issue with reproduction steps

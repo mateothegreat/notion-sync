@@ -17,7 +17,6 @@ export interface ValueObject {
   equals(other: ValueObject): boolean;
 }
 
-// Domain Events
 export interface DomainEvent {
   id: string;
   type: string;
@@ -263,8 +262,8 @@ export interface FileSystemConfig {
   compressionLevel: number;
   enableAtomicOperations: boolean;
   enableBackup: boolean;
-  namingStrategy: 'id' | 'title' | 'slug' | 'timestamp';
-  organizationStrategy: 'flat' | 'hierarchical' | 'by-type' | 'by-date';
-  encoding: 'utf8' | 'utf16le' | 'ascii';
+  namingStrategy: "id" | "title" | "slug" | "timestamp";
+  organizationStrategy: "flat" | "hierarchical" | "by-type" | "by-date";
+  encoding: "utf8" | "utf16le" | "ascii";
   enableChecksums: boolean;
 }

@@ -1,14 +1,14 @@
-# Code Assessment - Event-Driven Architecture Compliance
 
-## Overview
+## 1. Overview
 
 This document provides a detailed assessment of the current codebase against event-driven architecture principles, identifying dead code, architectural violations, and areas for improvement.
 
-## Event-Driven Architecture Principles Assessment
+## 2. Event-Driven Architecture Principles Assessment
 
-### ✅ Correctly Implemented
+### 2.1. ✅ Correctly Implemented
 
-#### 1. Domain Events (`/src/core/events/index.ts`)
+#### 2.1.1. Domain Events (`/src/core/events/index.ts`)
+
 ```typescript
 // GOOD: Proper event structure with factory methods
 export const ExportEvents = {
@@ -17,9 +17,11 @@ export const ExportEvents = {
   // ... other events
 };
 ```
+
 **Status**: ✅ Well-designed, follows event sourcing patterns
 
-#### 2. Control Plane (`/src/lib/control-plane/`)
+#### 2.1.2. Control Plane (`/src/lib/control-plane/`)
+
 ```typescript
 // GOOD: Centralized message bus with proper abstractions
 export class ControlPlane {
@@ -27,18 +29,22 @@ export class ControlPlane {
   async subscribe<T>(channel: string, handler: (message: Message<T>) => void | Promise<void>): Promise<() => void>
 }
 ```
+
 **Status**: ✅ Excellent implementation of event-driven communication
 
-#### 3. Domain Services (`/src/core/services/`)
+#### 2.1.3. Domain Services (`/src/core/services/`)
+
 ```typescript
 // GOOD: Services publish events instead of direct calls
 await this.eventPublisher(ExportEvents.started(export_.id, configuration));
 ```
+
 **Status**: ✅ Proper event publishing pattern
 
-### ❌ Architectural Violations
+### 2.2. ❌ Architectural Violations
 
-#### 1. Mixed Patterns in Export Command (`/src/commands/export.ts`)
+#### 2.2.1. Mixed Patterns in Export Command (`/src/commands/export.ts`)
+
 ```typescript
 // BAD: Direct service calls instead of event-driven
 const export_ = await this.exportService.createExport(configuration);
@@ -48,10 +54,12 @@ await this.exportService.startExport(export_.id);
 await this.controlPlane.publish('export.create', { configuration });
 await this.controlPlane.publish('export.start', { exportId });
 ```
+
 **Issue**: Command directly calls services instead of publishing commands
 **Impact**: Tight coupling, reduced scalability
 
-#### 2. Streaming Export Manager (`/src/lib/export/manager.ts`)
+#### 2.2.2. Streaming Export Manager (`/src/lib/export/manager.ts`)
+
 ```typescript
 // BAD: Old pattern with direct dependencies
 export class StreamingExportManager implements OperationEventEmitter {
@@ -62,10 +70,12 @@ export class StreamingExportManager implements OperationEventEmitter {
   ) {}
 }
 ```
+
 **Issue**: Not integrated with event-driven architecture
 **Impact**: Parallel implementation, confusion
 
-#### 3. In-Memory Repository (`/src/commands/export.ts:427`)
+#### 2.2.3. In-Memory Repository (`/src/commands/export.ts:427`)
+
 ```typescript
 // BAD: Inline repository implementation
 private createInMemoryExportRepository(): any {
@@ -78,20 +88,24 @@ private createInMemoryExportRepository(): any {
   };
 }
 ```
+
 **Issue**: Repository implementation in command layer
 **Impact**: Violates separation of concerns
 
-### 🔄 Partially Implemented
+### 2.3. 🔄 Partially Implemented
 
-#### 1. Progress Service (`/src/core/services/progress-service.ts`)
+#### 2.3.1. Progress Service (`/src/core/services/progress-service.ts`)
+
 ```typescript
 // MISSING: Implementation not found in codebase
 // Should exist but appears to be incomplete
 ```
+
 **Issue**: Referenced but not implemented
 **Impact**: Progress tracking incomplete
 
-#### 2. File System Operations
+#### 2.3.2. File System Operations
+
 ```typescript
 // INCOMPLETE: Placeholder implementation
 private async writeToOutput(data: any, type: string): Promise<void> {
@@ -100,12 +114,14 @@ private async writeToOutput(data: any, type: string): Promise<void> {
   this.log(`📄 Exported ${type}: ${data.id}`);
 }
 ```
+
 **Issue**: No actual file writing
 **Impact**: Export doesn't produce files
 
-## Dead Code Analysis
+## 3. Dead Code Analysis
 
-### 1. Obsolete Directory (`/old/`)
+### 3.1. Obsolete Directory (`/old/`)
+
 ```
 /old/application/
 /old/commands/
@@ -114,28 +130,34 @@ private async writeToOutput(data: any, type: string): Promise<void> {
 /old/optimized-cli.test.ts
 /old/optimized-cli.ts
 ```
+
 **Status**: 🗑️ **DELETE** - Completely obsolete, conflicts with new architecture
 
-### 2. Redundant Export Components
+### 3.2. Redundant Export Components
+
 ```
 /src/lib/export/manager.ts - Streaming manager (conflicts with event-driven)
 /src/lib/export/streaming.ts - Old streaming implementation
 /src/lib/export/exporter.ts - Direct export implementation
 ```
+
 **Status**: 🔄 **REFACTOR** - Extract useful patterns, remove direct dependencies
 
-### 3. Unused Utilities
+### 3.3. Unused Utilities
+
 ```
 /src/lib/export/eta-calculator.ts - Duplicates progress service functionality
 /src/lib/operations.ts - Complex retry logic, should use circuit breaker
 ```
+
 **Status**: 🔄 **CONSOLIDATE** - Merge with event-driven components
 
-## Architecture Compliance Issues
+## 4. Architecture Compliance Issues
 
-### 1. Command-Query Separation Violations
+### 4.1. Command-Query Separation Violations
 
-#### Current Implementation:
+#### 4.1.1. Current Implementation
+
 ```typescript
 // BAD: Command returns data
 async createExport(configuration: ExportConfiguration): Promise<Export> {
@@ -146,7 +168,8 @@ async createExport(configuration: ExportConfiguration): Promise<Export> {
 }
 ```
 
-#### Should Be:
+#### 4.1.2. Should Be
+
 ```typescript
 // GOOD: Command returns only success/failure
 async createExport(configuration: ExportConfiguration): Promise<CommandResult> {
@@ -157,16 +180,18 @@ async createExport(configuration: ExportConfiguration): Promise<CommandResult> {
 }
 ```
 
-### 2. Event Sourcing Violations
+### 4.2. Event Sourcing Violations
 
-#### Current Implementation:
+#### 4.2.1. Current Implementation
+
 ```typescript
 // BAD: Direct state mutation
 export_.start();
 await this.exportRepository.save(export_);
 ```
 
-#### Should Be:
+#### 4.2.2. Should Be
+
 ```typescript
 // GOOD: Event-driven state changes
 const events = export_.start(); // Returns events
@@ -174,25 +199,28 @@ await this.eventStore.append(export_.id, events);
 await this.eventPublisher.publishAll(events);
 ```
 
-### 3. Aggregate Boundary Violations
+### 4.3. Aggregate Boundary Violations
 
-#### Current Implementation:
+#### 4.3.1. Current Implementation
+
 ```typescript
 // BAD: Service directly modifies aggregate
 export_.updateProgress(progress);
 await this.exportRepository.save(export_);
 ```
 
-#### Should Be:
+#### 4.3.2. Should Be
+
 ```typescript
 // GOOD: Aggregate handles its own state
 const command = new UpdateProgressCommand(exportId, progress);
 const result = await this.commandBus.send(command);
 ```
 
-## Missing Event-Driven Components
+## 5. Missing Event-Driven Components
 
-### 1. Command Bus
+### 5.1. Command Bus
+
 ```typescript
 // MISSING: Command handling infrastructure
 export interface CommandBus {
@@ -201,7 +229,8 @@ export interface CommandBus {
 }
 ```
 
-### 2. Query Bus
+### 5.2. Query Bus
+
 ```typescript
 // MISSING: Query handling infrastructure
 export interface QueryBus {
@@ -210,7 +239,8 @@ export interface QueryBus {
 }
 ```
 
-### 3. Event Store
+### 5.3. Event Store
+
 ```typescript
 // MISSING: Persistent event storage
 export interface EventStore {
@@ -219,7 +249,8 @@ export interface EventStore {
 }
 ```
 
-### 4. Saga/Process Manager
+### 5.4. Saga/Process Manager
+
 ```typescript
 // MISSING: Long-running process coordination
 export class ExportProcessManager {
@@ -227,40 +258,46 @@ export class ExportProcessManager {
 }
 ```
 
-## Performance Anti-Patterns
+## 6. Performance Anti-Patterns
 
-### 1. Synchronous Event Publishing
+### 6.1. Synchronous Event Publishing
+
 ```typescript
 // BAD: Blocking event publishing
 await this.eventPublisher(ExportEvents.started(export_.id, configuration));
 ```
 
-#### Should Be:
+#### 6.1.1. Should Be
+
 ```typescript
 // GOOD: Asynchronous event publishing
 this.eventPublisher.publishAsync(ExportEvents.started(export_.id, configuration));
 ```
 
-### 2. In-Memory State Management
+### 6.2. In-Memory State Management
+
 ```typescript
 // BAD: All state in memory
 const exports = new Map();
 ```
 
-#### Should Be:
+#### 6.2.1. Should Be
+
 ```typescript
 // GOOD: Persistent event store with projections
 const events = await this.eventStore.getEvents(exportId);
 const export_ = Export.fromEvents(events);
 ```
 
-### 3. Unbounded Collections
+### 6.3. Unbounded Collections
+
 ```typescript
 // BAD: Unbounded error collection
 this.errorRecords.push(errorRecord);
 ```
 
-#### Should Be:
+#### 6.3.1. Should Be
+
 ```typescript
 // GOOD: Bounded with cleanup
 if (this.errorRecords.length > 200) {
@@ -268,9 +305,10 @@ if (this.errorRecords.length > 200) {
 }
 ```
 
-## Recommended Refactoring
+## 7. Recommended Refactoring
 
-### Phase 1: Remove Dead Code
+### 7.1. Phase 1: Remove Dead Code
+
 ```bash
 # Remove obsolete implementations
 rm -rf /old/
@@ -279,7 +317,8 @@ rm /src/lib/export/streaming.ts
 rm /src/lib/export/exporter.ts
 ```
 
-### Phase 2: Extract Useful Patterns
+### 7.2. Phase 2: Extract Useful Patterns
+
 ```typescript
 // Extract from old manager.ts:
 - Concurrency management patterns
@@ -290,7 +329,8 @@ rm /src/lib/export/exporter.ts
 // Integrate into event-driven architecture
 ```
 
-### Phase 3: Implement Missing Components
+### 7.3. Phase 3: Implement Missing Components
+
 ```typescript
 // Add command/query buses
 // Implement event store
@@ -298,28 +338,32 @@ rm /src/lib/export/exporter.ts
 // Add proper repositories
 ```
 
-### Phase 4: Refactor Command Layer
+### 7.4. Phase 4: Refactor Command Layer
+
 ```typescript
 // Convert direct service calls to command publishing
 // Implement proper command handlers
 // Add query handlers for read operations
 ```
 
-## Code Quality Issues
+## 8. Code Quality Issues
 
-### 1. Type Safety
+### 8.1. Type Safety
+
 ```typescript
 // BAD: Any types
 private createInMemoryExportRepository(): any {
 ```
 
-#### Should Be:
+#### 8.1.1. Should Be
+
 ```typescript
 // GOOD: Proper typing
 private createInMemoryExportRepository(): ExportRepository {
 ```
 
-### 2. Error Handling
+### 8.2. Error Handling
+
 ```typescript
 // BAD: Generic error handling
 } catch (error) {
@@ -329,7 +373,8 @@ private createInMemoryExportRepository(): ExportRepository {
 }
 ```
 
-#### Should Be:
+#### 8.2.1. Should Be
+
 ```typescript
 // GOOD: Structured error handling
 } catch (error) {
@@ -339,39 +384,45 @@ private createInMemoryExportRepository(): ExportRepository {
 }
 ```
 
-### 3. Configuration Management
+### 8.3. Configuration Management
+
 ```typescript
 // BAD: Hardcoded values
 memoryBounds: number = 50 * 1024 * 1024, // 50MB default
 ```
 
-#### Should Be:
+#### 8.3.1. Should Be
+
 ```typescript
 // GOOD: Configuration-driven
 memoryBounds: number = this.config.performance.memoryBounds,
 ```
 
-## Summary
+## 9. Summary
 
-### Critical Issues (Must Fix)
+### 9.1. Critical Issues (Must Fix)
+
 1. **Remove dead code** in `/old/` directory
 2. **Refactor export command** to use pure event-driven patterns
 3. **Implement missing event store** for persistence
 4. **Add command/query buses** for proper CQRS
 5. **Complete file system operations** for actual export functionality
 
-### Architecture Violations (Should Fix)
+### 9.2. Architecture Violations (Should Fix)
+
 1. **Direct service calls** instead of event publishing
 2. **Mixed architectural patterns** (old vs new)
 3. **Aggregate boundary violations** in services
 4. **Synchronous event publishing** blocking operations
 
-### Performance Issues (Should Optimize)
+### 9.3. Performance Issues (Should Optimize)
+
 1. **In-memory state management** limiting scalability
 2. **Unbounded collections** causing memory leaks
 3. **Blocking operations** reducing throughput
 
-### Code Quality (Nice to Have)
+### 9.4. Code Quality (Nice to Have)
+
 1. **Type safety improvements** removing any types
 2. **Error handling standardization** across components
 3. **Configuration externalization** removing hardcoded values

@@ -77,6 +77,13 @@ export class NotionClient implements NotionApiClient {
     });
   }
 
+  async getDatabases(): Promise<NotionDatabase[]> {
+    return this.executeWithProtection("getDatabases", async () => {
+      const response = await this.client.databases.list({});
+      return response.results.map((database) => this.transformDatabase(database));
+    });
+  }
+
   async queryDatabase(
     databaseId: string,
     options: any = {}

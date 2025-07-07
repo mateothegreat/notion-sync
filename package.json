@@ -23,8 +23,6 @@
   "devDependencies": {
     "@notionhq/client": "4.0.0",
     "@oclif/core": "4.4.1",
-    "@oclif/plugin-commands": "4.1.28",
-    "@oclif/plugin-help": "6.2.30",
     "@oclif/prettier-config": "0.2.1",
     "@oclif/test": "4.1.13",
     "@types/config": "^3.3.5",
@@ -51,7 +49,7 @@
     "dirname": "notion-sync",
     "helpClass": "./dist/lib/commands/help",
     "topicSeparator": " ",
-    "theme": "./src/theme.json",
+    "theme": "./theme.json",
     "hooks": {
       "init": [
         "./dist/hooks/init"
@@ -63,10 +61,6 @@
     "plugins": [
       "@oclif/plugin-version",
       "@oclif/plugin-help"
-    ],
-    "devPlugins": [
-      "@oclif/plugin-help",
-      "@oclif/plugin-commands"
     ]
   },
   "dependencies": {

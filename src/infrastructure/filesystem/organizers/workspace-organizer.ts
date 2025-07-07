@@ -1,13 +1,13 @@
 /**
  * Workspace Directory Organizer
- * 
+ *
  * Organizes exported files in a logical directory structure
  */
 
-import { promises as fs } from 'fs';
-import path from 'path';
-import { DirectoryOrganizer, FileSystemConfig } from '../types';
-import { NotionDatabase, NotionPage, ExportFormat } from '../../../shared/types';
+import { promises as fs } from "fs";
+import path from "path";
+import { ExportFormat, NotionDatabase, NotionPage } from "../../../shared/types";
+import { DirectoryOrganizer, FileSystemConfig } from "../types";
 
 export class WorkspaceOrganizer implements DirectoryOrganizer {
   private config: FileSystemConfig;
@@ -21,20 +21,16 @@ export class WorkspaceOrganizer implements DirectoryOrganizer {
    */
   getDatabasePath(database: NotionDatabase, basePath: string): string {
     switch (this.config.organizationStrategy) {
-      case 'flat':
+      case "flat":
         return basePath;
-
-      case 'hierarchical':
+      case "hierarchical":
         return this.getHierarchicalDatabasePath(database, basePath);
-
-      case 'by-type':
-        return path.join(basePath, 'databases');
-
-      case 'by-date':
-        return this.getDateBasedPath(database.createdTime, basePath, 'databases');
-
+      case "by-type":
+        return path.join(basePath, "databases");
+      case "by-date":
+        return this.getDateBasedPath(database.createdTime, basePath, "databases");
       default:
-        return path.join(basePath, 'databases');
+        return path.join(basePath, "databases");
     }
   }
 
@@ -43,20 +39,20 @@ export class WorkspaceOrganizer implements DirectoryOrganizer {
    */
   getPagePath(page: NotionPage, basePath: string): string {
     switch (this.config.organizationStrategy) {
-      case 'flat':
+      case "flat":
         return basePath;
 
-      case 'hierarchical':
+      case "hierarchical":
         return this.getHierarchicalPagePath(page, basePath);
 
-      case 'by-type':
-        return path.join(basePath, 'pages');
+      case "by-type":
+        return path.join(basePath, "pages");
 
-      case 'by-date':
-        return this.getDateBasedPath(page.createdTime, basePath, 'pages');
+      case "by-date":
+        return this.getDateBasedPath(page.createdTime, basePath, "pages");
 
       default:
-        return path.join(basePath, 'pages');
+        return path.join(basePath, "pages");
     }
   }
 
@@ -64,13 +60,14 @@ export class WorkspaceOrganizer implements DirectoryOrganizer {
    * Get the file path for a specific item
    */
   getFilePath(item: NotionDatabase | NotionPage, basePath: string, format: ExportFormat): string {
-    const directory = item.type === 'database' 
-      ? this.getDatabasePath(item as NotionDatabase, basePath)
-      : this.getPagePath(item as NotionPage, basePath);
+    const directory =
+      item.type === "database"
+        ? this.getDatabasePath(item as NotionDatabase, basePath)
+        : this.getPagePath(item as NotionPage, basePath);
 
     const filename = this.generateFilename(item);
     const extension = this.getExtensionForFormat(format);
-    
+
     return path.join(directory, `${filename}${extension}`);
   }
 
@@ -83,28 +80,28 @@ export class WorkspaceOrganizer implements DirectoryOrganizer {
 
     // Create standard subdirectories based on organization strategy
     switch (this.config.organizationStrategy) {
-      case 'flat':
+      case "flat":
         // No subdirectories needed
         break;
 
-      case 'hierarchical':
+      case "hierarchical":
         // Directories will be created as needed
         break;
 
-      case 'by-type':
+      case "by-type":
         await this.createTypeBasedStructure(basePath);
         break;
 
-      case 'by-date':
+      case "by-date":
         // Date directories will be created as needed
         break;
     }
 
     // Create metadata directory
-    await this.ensureDirectoryExists(path.join(basePath, '.metadata'));
+    await this.ensureDirectoryExists(path.join(basePath, ".metadata"));
 
     // Create assets directory for images, files, etc.
-    await this.ensureDirectoryExists(path.join(basePath, 'assets'));
+    await this.ensureDirectoryExists(path.join(basePath, "assets"));
   }
 
   /**
@@ -119,42 +116,42 @@ export class WorkspaceOrganizer implements DirectoryOrganizer {
    * Get assets directory path
    */
   getAssetsPath(basePath: string): string {
-    return path.join(basePath, 'assets');
+    return path.join(basePath, "assets");
   }
 
   /**
    * Get metadata directory path
    */
   getMetadataPath(basePath: string): string {
-    return path.join(basePath, '.metadata');
+    return path.join(basePath, ".metadata");
   }
 
   /**
    * Get export manifest file path
    */
   getManifestPath(basePath: string): string {
-    return path.join(this.getMetadataPath(basePath), 'manifest.json');
+    return path.join(this.getMetadataPath(basePath), "manifest.json");
   }
 
   /**
    * Get export log file path
    */
   getLogPath(basePath: string): string {
-    return path.join(this.getMetadataPath(basePath), 'export.log');
+    return path.join(this.getMetadataPath(basePath), "export.log");
   }
 
   /**
    * Get hierarchical path for database
    */
   private getHierarchicalDatabasePath(database: NotionDatabase, basePath: string): string {
-    const parts = ['databases'];
-    
+    const parts = ["databases"];
+
     // Add parent hierarchy if available
     if (database.parent) {
-      if (database.parent.type === 'page_id') {
-        parts.push('pages', database.parent.page_id!);
-      } else if (database.parent.type === 'database_id') {
-        parts.push('databases', database.parent.database_id!);
+      if (database.parent.type === "page_id") {
+        parts.push("pages", database.parent.page_id!);
+      } else if (database.parent.type === "database_id") {
+        parts.push("databases", database.parent.database_id!);
       }
     }
 
@@ -168,14 +165,14 @@ export class WorkspaceOrganizer implements DirectoryOrganizer {
    * Get hierarchical path for page
    */
   private getHierarchicalPagePath(page: NotionPage, basePath: string): string {
-    const parts = ['pages'];
-    
+    const parts = ["pages"];
+
     // Add parent hierarchy if available
     if (page.parent) {
-      if (page.parent.type === 'page_id') {
-        parts.push('pages', page.parent.page_id!);
-      } else if (page.parent.type === 'database_id') {
-        parts.push('databases', page.parent.database_id!);
+      if (page.parent.type === "page_id") {
+        parts.push("pages", page.parent.page_id!);
+      } else if (page.parent.type === "database_id") {
+        parts.push("databases", page.parent.database_id!);
       }
     }
 
@@ -191,8 +188,8 @@ export class WorkspaceOrganizer implements DirectoryOrganizer {
   private getDateBasedPath(dateString: string, basePath: string, type: string): string {
     const date = new Date(dateString);
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
 
     return path.join(basePath, type, year.toString(), month, day);
   }
@@ -201,13 +198,7 @@ export class WorkspaceOrganizer implements DirectoryOrganizer {
    * Create type-based directory structure
    */
   private async createTypeBasedStructure(basePath: string): Promise<void> {
-    const directories = [
-      'databases',
-      'pages',
-      'blocks',
-      'users',
-      'comments'
-    ];
+    const directories = ["databases", "pages", "blocks", "users", "comments"];
 
     for (const dir of directories) {
       await this.ensureDirectoryExists(path.join(basePath, dir));
@@ -219,16 +210,16 @@ export class WorkspaceOrganizer implements DirectoryOrganizer {
    */
   private generateFilename(item: NotionDatabase | NotionPage): string {
     switch (this.config.namingStrategy) {
-      case 'id':
+      case "id":
         return item.id;
 
-      case 'title':
+      case "title":
         return this.sanitizeFilename(item.title || item.id);
 
-      case 'slug':
+      case "slug":
         return this.createSlug(item.title || item.id);
 
-      case 'timestamp':
+      case "timestamp":
         return `${Date.now()}_${this.sanitizeFilename(item.title || item.id)}`;
 
       default:
@@ -241,10 +232,10 @@ export class WorkspaceOrganizer implements DirectoryOrganizer {
    */
   private sanitizeFilename(filename: string): string {
     return filename
-      .replace(/[<>:"/\\|?*]/g, '_') // Replace invalid characters
-      .replace(/\s+/g, '_') // Replace spaces with underscores
-      .replace(/_{2,}/g, '_') // Replace multiple underscores with single
-      .replace(/^_|_$/g, '') // Remove leading/trailing underscores
+      .replace(/[<>:"/\\|?*]/g, "_") // Replace invalid characters
+      .replace(/\s+/g, "_") // Replace spaces with underscores
+      .replace(/_{2,}/g, "_") // Replace multiple underscores with single
+      .replace(/^_|_$/g, "") // Remove leading/trailing underscores
       .substring(0, 255); // Limit length
   }
 
@@ -254,10 +245,10 @@ export class WorkspaceOrganizer implements DirectoryOrganizer {
   private createSlug(title: string): string {
     return title
       .toLowerCase()
-      .replace(/[^\w\s-]/g, '') // Remove special characters
-      .replace(/\s+/g, '-') // Replace spaces with hyphens
-      .replace(/-{2,}/g, '-') // Replace multiple hyphens with single
-      .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+      .replace(/[^\w\s-]/g, "") // Remove special characters
+      .replace(/\s+/g, "-") // Replace spaces with hyphens
+      .replace(/-{2,}/g, "-") // Replace multiple hyphens with single
+      .replace(/^-|-$/g, ""); // Remove leading/trailing hyphens
   }
 
   /**
@@ -266,15 +257,15 @@ export class WorkspaceOrganizer implements DirectoryOrganizer {
   private getExtensionForFormat(format: ExportFormat): string {
     switch (format) {
       case ExportFormat.JSON:
-        return '.json';
+        return ".json";
       case ExportFormat.MARKDOWN:
-        return '.md';
+        return ".md";
       case ExportFormat.HTML:
-        return '.html';
+        return ".html";
       case ExportFormat.CSV:
-        return '.csv';
+        return ".csv";
       default:
-        return '.txt';
+        return ".txt";
     }
   }
 
@@ -295,7 +286,7 @@ export class WorkspaceOrganizer implements DirectoryOrganizer {
   async createManifest(basePath: string, exportData: any): Promise<void> {
     const manifestPath = this.getManifestPath(basePath);
     const manifest = {
-      version: '1.0.0',
+      version: "1.0.0",
       exportId: exportData.exportId,
       timestamp: new Date().toISOString(),
       configuration: exportData.configuration,
@@ -314,14 +305,14 @@ export class WorkspaceOrganizer implements DirectoryOrganizer {
 
     try {
       const items = await fs.readdir(basePath, { withFileTypes: true });
-      
+
       for (const item of items) {
         if (item.isDirectory()) {
           structure[item.name] = await this.generateStructureMap(path.join(basePath, item.name));
         } else {
           const stats = await fs.stat(path.join(basePath, item.name));
           structure[item.name] = {
-            type: 'file',
+            type: "file",
             size: stats.size,
             modified: stats.mtime.toISOString()
           };
@@ -338,7 +329,7 @@ export class WorkspaceOrganizer implements DirectoryOrganizer {
    * Create README file for the export
    */
   async createReadme(basePath: string, exportData: any): Promise<void> {
-    const readmePath = path.join(basePath, 'README.md');
+    const readmePath = path.join(basePath, "README.md");
     const readme = this.generateReadmeContent(exportData);
     await fs.writeFile(readmePath, readme);
   }
@@ -356,7 +347,7 @@ This directory contains an export from Notion created on ${new Date().toISOStrin
 - **Export ID**: ${exportData.exportId}
 - **Format**: ${exportData.configuration.format}
 - **Created**: ${new Date().toISOString()}
-- **Total Items**: ${exportData.statistics?.totalItems || 'Unknown'}
+- **Total Items**: ${exportData.statistics?.totalItems || "Unknown"}
 
 ## Directory Structure
 

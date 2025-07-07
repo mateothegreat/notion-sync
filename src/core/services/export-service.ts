@@ -38,11 +38,9 @@ export class ExportService {
 
   async startExport(id: string): Promise<void> {
     const export_ = await this.getExport(id);
-
     export_.start();
-    await this.exportRepository.save(export_);
 
-    // Publish progress event
+    await this.exportRepository.save(export_);
     await this.eventPublisher(ExportEvents.progressUpdated(export_.id, export_.progress));
   }
 
@@ -54,9 +52,8 @@ export class ExportService {
     }
 
     export_.cancel(reason);
-    await this.exportRepository.save(export_);
 
-    // Publish event
+    await this.exportRepository.save(export_);
     await this.eventPublisher(ExportEvents.cancelled(export_.id, reason, export_.progress));
   }
 
