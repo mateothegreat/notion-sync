@@ -6,15 +6,16 @@ export default defineConfig({
     // disableConsoleIntercept: true,
     hideSkippedTests: true,
     name: "notion-sync",
-    printConsoleTrace: true,
+    printConsoleTrace: false,
     typecheck: {
       enabled: true
     },
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
+      all: true,
       include: ["src/**/*.ts"],
-      clean: true
+      exclude: ["src/**/*.test.ts", "src/**/*.d.ts", "src/index.ts"]
     }
   }
 });

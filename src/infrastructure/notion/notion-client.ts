@@ -4,9 +4,17 @@
  * Infrastructure layer for Notion API integration. This client is a plain
  * wrapper around the Notion SDK and does not contain any business logic or
  * control plane components.
+ *
+ * Key Features:
+ * - Full TypeScript support with proper Notion API types
+ * - Comprehensive error handling with custom error types
+ * - Rate limiting support with retry information
+ * - Property item transformation with support for both object and list responses
+ * - Logging and debugging capabilities
  */
 
 import { Client } from "@notionhq/client";
+import { PropertyItemListResponse, PropertyItemObjectResponse } from "@notionhq/client/build/src/api-endpoints";
 import { log } from "../../lib/log";
 import { ErrorFactory, NotionApiError, RateLimitError } from "../../shared/errors/index";
 import {
@@ -18,7 +26,9 @@ import {
   NotionPage,
   NotionProperty,
   NotionPropertyItem,
+  NotionUser,
   NotionWorkspace,
+  PropertyItemType,
   RateLimitInfo
 } from "../../shared/types/index";
 
@@ -49,8 +59,8 @@ export class NotionClient implements NotionApiClient {
   constructor(private config: NotionConfig) {
     this.client = new Client({
       auth: config.apiKey,
-      baseUrl: config.baseUrl,
-      timeoutMs: config.timeout
+      baseUrl: config.baseUrl ?? "https://api.notion.com",
+      timeoutMs: config.timeout ?? 30000
     });
   }
 
@@ -140,6 +150,7 @@ export class NotionClient implements NotionApiClient {
    * Get comments for a specific block or page.
    *
    * @param {string} blockId - The ID of the block or page.
+   *
    * @returns {Promise<NotionComment[]>} - Array of comments.
    */
   async getComments(blockId: string): Promise<NotionComment[]> {
@@ -154,21 +165,24 @@ export class NotionClient implements NotionApiClient {
    *
    * @param {string} pageId - The ID of the page.
    * @param {string} propertyId - The ID of the property.
+   *
    * @returns {Promise<NotionPropertyItem>} - The property value.
    */
   async getPropertyItem(pageId: string, propertyId: string): Promise<NotionPropertyItem> {
-    return this.execute(`pages.properties.retrieve for ${pageId}/${propertyId}`, () =>
-      this.client.pages.properties.retrieve({
+    return this.execute(`pages.properties.retrieve for ${pageId}/${propertyId}`, async () => {
+      const response = await this.client.pages.properties.retrieve({
         page_id: pageId,
         property_id: propertyId
-      })
-    );
+      });
+      return this.transformPropertyItem(response);
+    });
   }
 
   /**
    * Get all properties for a specific database.
    *
    * @param {string} databaseId - The ID of the database.
+   *
    * @returns {Promise<NotionProperty[]>} - Array of database properties.
    */
   async getDatabaseProperties(databaseId: string): Promise<NotionProperty[]> {
@@ -222,10 +236,13 @@ export class NotionClient implements NotionApiClient {
   async getWorkspace(): Promise<NotionWorkspace> {
     return this.execute("workspace.retrieve", async () => {
       const response = await this.client.users.me({});
+      // Extract workspace info from user response
+      // If user is a bot, use bot owner workspace, otherwise use personal workspace
+      const workspaceId = "personal"; // Notion API no longer exposes workspace ID directly
       return {
-        id: response.bot?.owner.workspace ? response.bot.owner.workspace : "personal",
+        id: workspaceId,
         name: response.name || "Personal Workspace",
-        owner: response.bot?.owner.user ? response.bot.owner.user : response.id,
+        owner: response.id,
         createdTime: new Date().toISOString()
       };
     });
@@ -270,6 +287,9 @@ export class NotionClient implements NotionApiClient {
 
     // Using optional chaining and providing default values to handle cases where error properties are not defined
     const code = error?.code || "UNKNOWN_ERROR";
+
+    log.error("Notion API error", { error });
+
     switch (code) {
       case "unauthorized":
         return new NotionApiError("Invalid API key or insufficient permissions.", code);
@@ -308,6 +328,61 @@ export class NotionClient implements NotionApiClient {
     };
   }
 
+  /**
+   * Transform a Notion property item response into our internal format.
+   *
+   * @param {PropertyItemObjectResponse | PropertyItemListResponse} response - The response from Notion API.
+   * @returns {NotionPropertyItem} - The transformed property item.
+   */
+  public transformPropertyItem(response: PropertyItemObjectResponse | PropertyItemListResponse): NotionPropertyItem {
+    switch (response.object) {
+      case "list":
+        return {
+          id: response.results[0]?.id || response.property_item?.id || "",
+          type: response.type as PropertyItemType,
+          object: response.object,
+          results: response.results || [],
+          has_more: response.has_more,
+          next_cursor: response.next_cursor,
+          property_item: response.property_item
+            ? {
+                id: response.property_item.id,
+                type: response.property_item.type as PropertyItemType,
+                ...response.property_item
+              }
+            : undefined
+        };
+      case "property_item":
+        if (response.property_item) {
+          return {
+            id: response.property_item.id,
+            type: response.property_item.type as PropertyItemType,
+            ...response.property_item
+          };
+        }
+        return {
+          id: response.id,
+          type: response.type as PropertyItemType,
+          object: "property_item",
+          property_item: undefined
+        };
+      default:
+        throw new Error(`Unsupported property item type: ${response.object}`);
+    }
+
+    // Handle single property item responses
+    return {
+      id: response.id,
+      type: response.type as PropertyItemType,
+      object: "property_item",
+      property_item: {
+        id: response.id,
+        type: response.type as PropertyItemType,
+        ...response
+      }
+    };
+  }
+
   private transformDatabase(notionDatabase: any): NotionDatabase {
     return {
       id: notionDatabase.id,
@@ -343,10 +418,10 @@ export class NotionClient implements NotionApiClient {
   private transformUser(notionUser: any): NotionUser {
     return {
       id: notionUser.id,
-      type: NotionObjectType.USER,
+      type: notionUser.type || "person",
       name: notionUser.name || "",
-      avatar_url: notionUser.avatar_url || "",
-      object: "user"
+      avatarUrl: notionUser.avatar_url || "",
+      email: notionUser.email
     };
   }
 

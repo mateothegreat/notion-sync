@@ -310,7 +310,7 @@ function setNestedValue(obj: any, path: string, value: any): void {
 /**
  * Load configuration from environment variables
  */
-function loadFromEnvironment(envPrefix: string = "NOTION_SYNC_"): Partial<AppConfig> {
+function loadFromEnvironment(envPrefix: string = "NOTION_SYNC_", envFile: string = ".env"): Partial<AppConfig> {
   const config: any = {};
 
   // Load from predefined mapping
@@ -328,6 +328,14 @@ function loadFromEnvironment(envPrefix: string = "NOTION_SYNC_"): Partial<AppCon
       const configKey = key.replace(envPrefix, "").toLowerCase().replace(/_/g, ".");
 
       setNestedValue(config, configKey, value);
+    }
+  }
+
+  // Load from .env file
+  if (envFile) {
+    const envConfig = require(envFile);
+    for (const [key, value] of Object.entries(envConfig)) {
+      setNestedValue(config, key, value);
     }
   }
 
@@ -430,6 +438,12 @@ export async function loadConfig(options: ConfigOptions = {}): Promise<AppConfig
     }
   }
   configs.push(argConfig);
+
+  // For tests, load from .env.test
+  if (process.env.NODE_ENV === "test") {
+    const testEnvConfig = loadFromEnvironment("NOTION_SYNC_", ".env.test");
+    configs.push(testEnvConfig);
+  }
 
   // Merge all configurations
   const mergedConfig = mergeConfigs(...configs);

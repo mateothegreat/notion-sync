@@ -37,7 +37,7 @@ export default class Export extends BaseCommand<typeof Export> {
   private exportService?: ExportService;
   private progressService?: ProgressService;
   private notionClient?: NotionClient;
-  private fileSystemManager?: FileSystemManager;
+  private fileSystemManager: FileSystemManager;
   private resolvedConfig: any;
 
   public async run(): Promise<void> {
@@ -294,6 +294,7 @@ export default class Export extends BaseCommand<typeof Export> {
             );
             if (sectionErrors && sectionErrors.length > 0) {
               this.log(`   ⚠️  Section errors: ${sectionErrors.length}`);
+              log.error("Section errors", { sectionErrors });
             }
           }
           break;
@@ -583,10 +584,17 @@ export default class Export extends BaseCommand<typeof Export> {
     };
   }
 
+  private handleExportError(exportId: string, objectType: string, objectId: string | undefined, error: any) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    this.log(`❌ Error exporting ${objectType}${objectId ? ` (ID: ${objectId})` : ""}: ${errorMessage}`);
+    // Here you would also update the export progress and record the error in the export entity
+    // For now, we just log it.
+  }
+
   private async exportWorkspaceMetadata(exportId: string, outputPath: string): Promise<void> {
     try {
       const workspace = await this.notionClient.getWorkspace();
-      await this.fileSystemManager.writeRawData(workspace, `${outputPath}/workspace.json`);
+      await this.fileSystemManager.writeRawData(workspace, path.join(outputPath, "workspace.json"));
     } catch (error) {
       this.handleExportError(exportId, "workspace", undefined, error);
     }
@@ -595,7 +603,7 @@ export default class Export extends BaseCommand<typeof Export> {
   private async exportUsers(exportId: string, outputPath: string): Promise<void> {
     try {
       const users = await this.notionClient.getUsers();
-      await this.fileSystemManager.writeRawData(users, `${outputPath}/users.json`);
+      await this.fileSystemManager.writeRawData(users, path.join(outputPath, "users.json"));
     } catch (error) {
       this.handleExportError(exportId, "users", undefined, error);
     }

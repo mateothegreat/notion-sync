@@ -4,13 +4,18 @@
  * Central manager for all file system operations with atomic transactions
  */
 
+import fs from "fs";
+import path from "path";
+import { promisify } from "util";
 import { FileSystemEvents } from "../../core/events";
 import { ExportFormat, NotionBlock, NotionDatabase, NotionPage } from "../../shared/types";
 import { AtomicFileOperationManager } from "./atomic-operations";
 import { WorkspaceOrganizer } from "./organizers/workspace-organizer";
-import { AtomicFileOperation, FileSystemConfig, FileWriter } from "./types";
+import { AtomicFileOperation, FileSystemConfig, FileWriter, FileWriteResult } from "./types";
 import { JSONWriter } from "./writers/json-writer";
 import { MarkdownWriter } from "./writers/markdown-writer";
+
+const writeFile = promisify(fs.writeFile);
 
 export class FileSystemManager {
   private config: FileSystemConfig;
@@ -319,5 +324,44 @@ export class FileSystemManager {
       encoding: "utf8",
       enableChecksums: true
     };
+  }
+
+  /**
+   * Write raw data to a file.
+   *
+   * @param {any} data - The data to write.
+   * @param {string} outputPath - The full path to the output file.
+   * @returns {Promise<FileWriteResult>} - The result of the write operation.
+   */
+  async writeRawData(data: any, outputPath: string): Promise<FileWriteResult> {
+    try {
+      const dir = path.dirname(outputPath);
+      await this.ensureDirectoryExists(dir);
+
+      const jsonData = JSON.stringify(data, null, 2);
+      await writeFile(outputPath, jsonData, "utf8");
+
+      return {
+        success: true,
+        filePath: outputPath,
+        fileSize: Buffer.byteLength(jsonData, "utf8"),
+        duration: 0 // We don't measure duration for now
+      };
+    } catch (error) {
+      return {
+        success: false,
+        filePath: outputPath,
+        error: error as Error,
+        duration: 0
+      };
+    }
+  }
+
+  async ensureDirectoryExists(dirPath: string): Promise<void> {
+    try {
+      await fs.promises.mkdir(dirPath, { recursive: true });
+    } catch (error) {
+      throw new Error(`Failed to create directory: ${dirPath}`);
+    }
   }
 }

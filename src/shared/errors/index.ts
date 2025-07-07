@@ -8,16 +8,27 @@ export abstract class DomainError extends Error {
   abstract readonly code: string;
   abstract readonly statusCode: number;
 
-  constructor(
-    message: string,
-    public readonly context?: Record<string, any>
-  ) {
+  constructor(message: string, public readonly context?: Record<string, any>) {
     super(message);
     this.name = this.constructor.name;
     Error.captureStackTrace(this, this.constructor);
   }
 
-  toJSON() {
+  /**
+   * Convert the error to a JSON string.
+   *
+   * @returns {string} - The JSON string representation of the error.
+   */
+  toString(): string {
+    return JSON.stringify(this.toJSON());
+  }
+
+  /**
+   * Convert the error to a JSON object.
+   *
+   * @returns {Record<string, any>} - The JSON object representation of the error.
+   */
+  toJSON(): Record<string, any> {
     return {
       name: this.name,
       code: this.code,
@@ -61,11 +72,7 @@ export class NotionApiError extends DomainError {
   readonly code = "NOTION_API_ERROR";
   readonly statusCode = 502;
 
-  constructor(
-    message: string,
-    public readonly notionErrorCode?: string,
-    context?: Record<string, any>
-  ) {
+  constructor(message: string, public readonly notionErrorCode?: string, context?: Record<string, any>) {
     super(message, { ...context, notionErrorCode });
   }
 }
@@ -74,11 +81,7 @@ export class RateLimitError extends DomainError {
   readonly code = "RATE_LIMIT_ERROR";
   readonly statusCode = 429;
 
-  constructor(
-    message: string,
-    public readonly retryAfter?: number,
-    context?: Record<string, any>
-  ) {
+  constructor(message: string, public readonly retryAfter?: number, context?: Record<string, any>) {
     super(message, { ...context, retryAfter });
   }
 }

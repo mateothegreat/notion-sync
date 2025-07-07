@@ -4,7 +4,7 @@
  * Events that represent business-significant occurrences
  */
 
-import { DomainEvent, ExportStatus, ProgressInfo, ErrorInfo } from "../../shared/types";
+import { DomainEvent, ErrorInfo, ProgressInfo } from "../../shared/types";
 
 // Base event factory
 export function createDomainEvent(
