@@ -335,52 +335,38 @@ export class NotionClient implements NotionApiClient {
    * @returns {NotionPropertyItem} - The transformed property item.
    */
   public transformPropertyItem(response: PropertyItemObjectResponse | PropertyItemListResponse): NotionPropertyItem {
-    switch (response.object) {
-      case "list":
-        return {
-          id: response.results[0]?.id || response.property_item?.id || "",
-          type: response.type as PropertyItemType,
-          object: response.object,
-          results: response.results || [],
-          has_more: response.has_more,
-          next_cursor: response.next_cursor,
-          property_item: response.property_item
-            ? {
-                id: response.property_item.id,
-                type: response.property_item.type as PropertyItemType,
-                ...response.property_item
-              }
-            : undefined
-        };
-      case "property_item":
-        if (response.property_item) {
-          return {
-            id: response.property_item.id,
-            type: response.property_item.type as PropertyItemType,
-            ...response.property_item
-          };
-        }
-        return {
-          id: response.id,
-          type: response.type as PropertyItemType,
-          object: "property_item",
-          property_item: undefined
-        };
-      default:
-        throw new Error(`Unsupported property item type: ${response.object}`);
-    }
-
-    // Handle single property item responses
-    return {
-      id: response.id,
-      type: response.type as PropertyItemType,
-      object: "property_item",
-      property_item: {
-        id: response.id,
+    // Check if response is a list response by looking for the 'results' property
+    if ("results" in response && Array.isArray(response.results)) {
+      // This is a PropertyItemListResponse
+      return {
+        id: response.results[0]?.id || response.property_item?.id || "",
         type: response.type as PropertyItemType,
-        ...response
-      }
-    };
+        object: "list",
+        results: response.results || [],
+        has_more: response.has_more,
+        next_cursor: response.next_cursor,
+        property_item: response.property_item
+          ? {
+              id: response.property_item.id,
+              type: response.property_item.type as PropertyItemType,
+              ...response.property_item
+            }
+          : undefined
+      };
+    } else {
+      // This is a PropertyItemObjectResponse
+      const objectResponse = response as PropertyItemObjectResponse;
+      return {
+        id: objectResponse.id,
+        type: objectResponse.type as PropertyItemType,
+        object: "property_item",
+        property_item: {
+          id: objectResponse.id,
+          type: objectResponse.type as PropertyItemType,
+          ...objectResponse
+        }
+      };
+    }
   }
 
   private transformDatabase(notionDatabase: any): NotionDatabase {

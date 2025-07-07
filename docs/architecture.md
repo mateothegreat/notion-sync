@@ -23,12 +23,12 @@ graph TB
         AGG[Aggregates]
         DOM_SVC[Domain Services]
         DOM_EVT[Domain Events]
-        
+      
         subgraph "Export Aggregate"
             EXPORT[Export Entity]
             EXPORT_SVC[Export Service]
         end
-        
+      
         subgraph "Progress Aggregate"
             PROGRESS[Progress Entity]
             PROGRESS_SVC[Progress Service]
@@ -63,26 +63,26 @@ graph TB
     CMD --> COORD
     COORD --> EXPORT_SVC
     COORD --> PROGRESS_SVC
-    
+  
     EXPORT_SVC --> DOM_EVT
     PROGRESS_SVC --> DOM_EVT
-    
+  
     DOM_EVT --> MSG_BUS
     MSG_BUS --> EVT_STORE
-    
+  
     EXPORT_SVC --> REPO
     PROGRESS_SVC --> REPO
-    
+  
     COORD --> NOTION
     COORD --> FS
-    
+  
     NOTION --> CB
     NOTION --> RL
-    
+  
     MSG_BUS --> MW
     MW --> LOG
     MW --> METRICS
-    
+  
     STATE --> COMP
 ```
 
@@ -160,10 +160,10 @@ sequenceDiagram
 
     CLI->>ExportService: createExport(config)
     ExportService->>MessageBus: publish(ExportStarted)
-    
+  
     CLI->>ExportService: startExport(id)
     ExportService->>MessageBus: publish(ExportProgressUpdated)
-    
+  
     loop For each database/page
         ExportService->>NotionClient: getDatabase/Page(id)
         NotionClient->>MessageBus: publish(NotionObjectFetched)
@@ -172,7 +172,7 @@ sequenceDiagram
         ExportService->>ProgressService: updateProgress()
         ProgressService->>MessageBus: publish(ProgressUpdated)
     end
-    
+  
     ExportService->>MessageBus: publish(ExportCompleted)
 ```
 

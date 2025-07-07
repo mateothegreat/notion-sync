@@ -1,0 +1,35 @@
+# Notion Sync Configuration
+# This file contains configuration options for the Notion Sync CLI
+# Environment variables and command-line flags will override these values
+
+# Global Settings
+# These settings apply to all commands
+flush: false
+timeout: 300
+token: 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
+verbose: true
+concurrency: 5
+retries: 3
+
+# Export Command Settings
+# Settings specific to the 'export' command
+# Output directory path for exported files.
+path: ./exports/notion-workspace
+# Comma-separated list of database IDs to export. Can be provided as comma-separated IDs or configured in config file.
+databases:
+  - name: content
+    id: 16ad7342e57180c4a065c7a1015871d3
+# Comma-separated list of page IDs to export.
+# pages: 550e8400-e29b-41d4-a716-446655440000,6ba7b810-9dad-11d1-80b4-00c04fd430c8
+# Export format.
+format: markdown
+# Maximum number of concurrent requests for export.
+max-concurrency: 5
+# Include block content in export.
+include-blocks: true
+# Include comments in export.
+include-comments: true
+# Include all properties in export.
+include-properties: true
+# Output directory (alias for --path).
+output: ./exports/notion-workspace

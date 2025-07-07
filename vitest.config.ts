@@ -2,8 +2,12 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    setupFiles: ["./src/vitest.setup.ts"],
-    // disableConsoleIntercept: true,
+    bail: 5,
+    maxConcurrency: 10,
+    passWithNoTests: false,
+    isolate: true,
+    silent: false,
+    update: false,
     hideSkippedTests: true,
     name: "notion-sync",
     printConsoleTrace: false,
@@ -15,18 +19,22 @@ export default defineConfig({
       reporter: ["text", "json", "html"],
       all: true,
       include: ["src/**/*.ts"],
-      exclude: ["src/**/*.test.ts", "src/**/*.d.ts", "src/index.ts"]
+      exclude: ["src/**/*.test.ts", "src/**/*.d.ts", "src/index.ts"],
+      enabled: true,
+      clean: true,
+      ignoreEmptyLines: true,
+      watermarks: {
+        branches: [80, 100],
+        functions: [80, 100],
+        lines: [80, 100],
+        statements: [80, 100]
+      },
+      thresholds: {
+        branches: 80,
+        functions: 80,
+        lines: 80,
+        statements: 80
+      }
     }
   }
 });
-
-interface ExportMetrics {
-  totalApiCalls: number;
-  averageResponseTime: number;
-  errorRate: number;
-  rateLimitHits: number;
-  cacheHitRate: number;
-  concurrencyUtilization: number;
-  throughputPerSecond: number;
-  memoryEfficiency: number;
-}

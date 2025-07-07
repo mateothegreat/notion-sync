@@ -4,11 +4,11 @@
  * Handles export-related commands in the CQRS architecture
  */
 
-import { ExportService } from "../../core/services/export-service";
 import { ProgressService } from "../../core/services/progress-service";
 import { FileSystemManager } from "../../infrastructure/filesystem/file-system-manager";
 import { NotionClient } from "../../infrastructure/notion/notion-client";
 import { CommandHandler } from "../../lib/control-plane/types";
+import { ExportService } from "../../lib/export/export-service";
 import { ExportConfiguration, ExportFormat } from "../../shared/types/index";
 
 /**

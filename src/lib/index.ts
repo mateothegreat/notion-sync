@@ -28,3 +28,9 @@ export * from "./export/util";
 export { ETACalculator } from "./export/eta-calculator";
 
 export { NotionStreamingExporter, StreamingExportManager } from "./export/manager";
+
+// Config generation utilities
+export { generateConfigYaml } from "./config/config-loader";
+
+// Config types
+export type { Config, ConfigOptions } from "./config/config-loader";
