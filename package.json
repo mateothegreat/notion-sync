@@ -22,7 +22,7 @@
   },
   "devDependencies": {
     "@notionhq/client": "4.0.0",
-    "@oclif/core": "4.4.1",
+    "@oclif/core": "^4.4.1",
     "@oclif/prettier-config": "0.2.1",
     "@oclif/test": "4.1.13",
     "@types/config": "^3.3.5",
@@ -39,7 +39,7 @@
     "tsx": "^4.20.3",
     "typescript": "5.8.3",
     "vite-tsconfig-paths": "5.1.4",
-    "vitest": "3.2.4"
+    "vitest": "^3.2.4"
   },
   "bin": {
     "notion-sync": "./bin/run.js"
@@ -72,7 +72,7 @@
     "immer": "10.1.1",
     "rxjs": "7.8.2",
     "yaml": "^2.8.0",
-    "zod": "^3.25.74",
+    "zod": "^3.25.75",
     "zod-config": "^1.1.1"
   }
 }
