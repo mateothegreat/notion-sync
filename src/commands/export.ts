@@ -7,6 +7,7 @@ import { log } from "$lib/log";
 import chalk from "chalk";
 import { promises as fs } from "fs";
 import path from "path";
+import { lastValueFrom } from "rxjs";
 import { inspect } from "util";
 
 import { Exporter, ExportFormat } from "$lib/exporters/exporter";
@@ -40,19 +41,19 @@ export default class Export extends BaseCommand<typeof Export> {
   private exporters: Exporter[] = [];
 
   public async run(): Promise<void> {
-    const { flags } = await this.parse(Export);
-    this.exportConfig = (await loadCommandConfig("export", flags)).rendered;
-
-    log.debugging.inspect("renderd", this.exportConfig);
-
-    this.exporters = [
-      jsonExporterHook({
-        formats: [ExportFormat.JSON],
-        types: [NotionObjectType.DATABASE, NotionObjectType.PAGE]
-      })
-    ];
-
     try {
+      const { flags } = await this.parse(Export);
+      this.exportConfig = (await loadCommandConfig("export", flags)).rendered;
+
+      log.debugging.inspect("renderd", this.exportConfig);
+
+      this.exporters = [
+        jsonExporterHook({
+          formats: [ExportFormat.JSON],
+          types: [NotionObjectType.DATABASE, NotionObjectType.PAGE]
+        })
+      ];
+
       // Parse databases and pages
       let databases: string[] = this.exportConfig.databases.map((db) => db.id);
       let pages: string[] = this.exportConfig.pages ? this.exportConfig.pages.map((p) => p.id) : [];
@@ -93,7 +94,7 @@ export default class Export extends BaseCommand<typeof Export> {
       this.log(chalk.green("\n✅ Export completed successfully!"));
       this.log(`📁 Files saved to: ${chalk.yellow(outputPath)}`);
     } catch (error) {
-      if (this.exportConfig.verbose) {
+      if (this.exportConfig?.verbose) {
         log.error("Export error details", { error: inspect(error, { colors: true, compact: false }) });
       }
 
@@ -104,7 +105,7 @@ export default class Export extends BaseCommand<typeof Export> {
       }
     } finally {
       if (this.controlPlane) {
-        await this.controlPlane.destroy();
+        await lastValueFrom(this.controlPlane.destroy());
       }
     }
   }
@@ -123,8 +124,8 @@ export default class Export extends BaseCommand<typeof Export> {
       autoStartComponents: true
     });
 
-    await this.controlPlane.initialize();
-    await this.controlPlane.start();
+    await lastValueFrom(this.controlPlane.initialize());
+    await lastValueFrom(this.controlPlane.start());
 
     // Create notion configuration.
     const notionConfig: NotionConfig = {
@@ -189,113 +190,118 @@ export default class Export extends BaseCommand<typeof Export> {
      * Subscribe to domain events so we can track the progress of the various
      * services and sections of the export.
      */
-    this.controlPlane.subscribe("domain-events", async (message) => {
-      const event = message.payload as any;
+    this.controlPlane.subscribe("domain-events").subscribe({
+      next: async (message) => {
+        const event = message.payload as any;
 
-      if (!event || typeof event !== "object" || !event.type) {
-        return;
-      }
+        if (!event || typeof event !== "object" || !event.type) {
+          return;
+        }
 
-      switch (event.type) {
-        case "export.progress.updated":
-          const progress = event.payload?.progress;
-          if (!progress) break;
+        switch (event.type) {
+          case "export.progress.updated":
+            const progress = event.payload?.progress;
+            if (!progress) break;
 
-          // Only show progress updates every 10% to avoid spamming the console.
-          const currentProgress = Math.floor(progress.percentage / 10) * 10;
-          if (currentProgress > lastProgress) {
-            this.log(
-              `📊 Progress: ${currentProgress}% (${progress.processed}/${progress.total}) - ${progress.currentOperation}`
-            );
-            lastProgress = currentProgress;
-          }
-
-          if (progress.estimatedCompletion && progress.percentage > 10) {
-            const eta = new Date(progress.estimatedCompletion);
-            const now = new Date();
-            const remainingMs = eta.getTime() - now.getTime();
-            const remainingMin = Math.ceil(remainingMs / 60000);
-
-            if (remainingMin > 0) {
-              this.log(`⏱️  ETA: ${remainingMin} minutes`);
-            }
-          }
-          break;
-
-        case "export.completed":
-          const duration = event.payload?.duration;
-          const itemsProcessed = event.payload?.itemsProcessed;
-          const errors = event.payload?.errors;
-
-          if (duration && itemsProcessed && errors) {
-            this.log(chalk.green("\n🎉 Export Statistics:"));
-            this.log(`   📦 Items processed: ${chalk.cyan(itemsProcessed)}`);
-            this.log(`   ⏱️  Duration: ${chalk.cyan((duration / 1000).toFixed(1))}s`);
-            this.log(`   🚀 Items/second: ${chalk.cyan((itemsProcessed / (duration / 1000)).toFixed(1))}`);
-
-            if (errors.length > 0) {
-              this.log(`   ⚠️  Errors: ${chalk.yellow(errors.length)}`);
-            } else {
-              this.log(`   ✅ No errors`);
-            }
-          }
-          break;
-
-        case "export.failed":
-          const error = event.payload?.error;
-          if (error?.message) {
-            this.error(chalk.red(`❌ Export failed: ${error.message}`));
-          }
-          break;
-
-        case "notion.rate_limit.hit":
-          const retryAfter = event.payload?.retryAfter;
-          if (retryAfter) {
-            this.log(chalk.yellow(`⏳ Rate limit hit. Waiting ${retryAfter} seconds...`));
-          }
-          break;
-
-        case "circuit_breaker.opened":
-          const breakerName = event.payload?.name;
-          if (breakerName) {
-            this.log(chalk.yellow(`🔌 Circuit breaker opened for ${breakerName}. Requests temporarily blocked.`));
-          }
-          break;
-
-        case "circuit_breaker.closed":
-          const closedBreakerName = event.payload?.name;
-          if (closedBreakerName) {
-            this.log(chalk.green(`🔌 Circuit breaker closed for ${closedBreakerName}. Requests resumed.`));
-          }
-          break;
-
-        case "progress.section.started":
-          const section = event.payload?.section;
-          const totalItems = event.payload?.totalItems;
-          if (section && totalItems) {
-            this.log(`📂 Starting section: ${chalk.cyan(section)} (${totalItems} items)`);
-          }
-          break;
-
-        case "progress.section.completed":
-          const completedSection = event.payload?.section;
-          const sectionDuration = event.payload?.duration;
-          const sectionErrors = event.payload?.errors;
-          log.debugging.inspect("progress.section.completed", { event });
-          if (completedSection && sectionDuration) {
-            if (sectionErrors && sectionErrors.length > 0) {
-              log.error("Section errors", { sectionErrors });
-            } else {
+            // Only show progress updates every 10% to avoid spamming the console.
+            const currentProgress = Math.floor(progress.percentage / 10) * 10;
+            if (currentProgress > lastProgress) {
               this.log(
-                `✅ Completed section: ${chalk.cyan(completedSection)} in ${(sectionDuration / 1000).toFixed(1)}s`
+                `📊 Progress: ${currentProgress}% (${progress.processed}/${progress.total}) - ${progress.currentOperation}`
               );
+              lastProgress = currentProgress;
             }
-          }
-          break;
 
-        case "notion.object.fetched":
-          // Optional: log individual object fetches in verbose mode
-          break;
+            if (progress.estimatedCompletion && progress.percentage > 10) {
+              const eta = new Date(progress.estimatedCompletion);
+              const now = new Date();
+              const remainingMs = eta.getTime() - now.getTime();
+              const remainingMin = Math.ceil(remainingMs / 60000);
+
+              if (remainingMin > 0) {
+                this.log(`⏱️  ETA: ${remainingMin} minutes`);
+              }
+            }
+            break;
+
+          case "export.completed":
+            const duration = event.payload?.duration;
+            const itemsProcessed = event.payload?.itemsProcessed;
+            const errors = event.payload?.errors;
+
+            if (duration && itemsProcessed && errors) {
+              this.log(chalk.green("\n🎉 Export Statistics:"));
+              this.log(`   📦 Items processed: ${chalk.cyan(itemsProcessed)}`);
+              this.log(`   ⏱️  Duration: ${chalk.cyan((duration / 1000).toFixed(1))}s`);
+              this.log(`   🚀 Items/second: ${chalk.cyan((itemsProcessed / (duration / 1000)).toFixed(1))}`);
+
+              if (errors.length > 0) {
+                this.log(`   ⚠️  Errors: ${chalk.yellow(errors.length)}`);
+              } else {
+                this.log(`   ✅ No errors`);
+              }
+            }
+            break;
+
+          case "export.failed":
+            const error = event.payload?.error;
+            if (error?.message) {
+              this.error(chalk.red(`❌ Export failed: ${error.message}`));
+            }
+            break;
+
+          case "notion.rate_limit.hit":
+            const retryAfter = event.payload?.retryAfter;
+            if (retryAfter) {
+              this.log(chalk.yellow(`⏳ Rate limit hit. Waiting ${retryAfter} seconds...`));
+            }
+            break;
+
+          case "circuit_breaker.opened":
+            const breakerName = event.payload?.name;
+            if (breakerName) {
+              this.log(chalk.yellow(`🔌 Circuit breaker opened for ${breakerName}. Requests temporarily blocked.`));
+            }
+            break;
+
+          case "circuit_breaker.closed":
+            const closedBreakerName = event.payload?.name;
+            if (closedBreakerName) {
+              this.log(chalk.green(`🔌 Circuit breaker closed for ${closedBreakerName}. Requests resumed.`));
+            }
+            break;
+
+          case "progress.section.started":
+            const section = event.payload?.section;
+            const totalItems = event.payload?.totalItems;
+            if (section && totalItems) {
+              this.log(`📂 Starting section: ${chalk.cyan(section)} (${totalItems} items)`);
+            }
+            break;
+
+          case "progress.section.completed":
+            const completedSection = event.payload?.section;
+            const sectionDuration = event.payload?.duration;
+            const sectionErrors = event.payload?.errors;
+            log.debugging.inspect("progress.section.completed", { event });
+            if (completedSection && sectionDuration) {
+              if (sectionErrors && sectionErrors.length > 0) {
+                log.error("Section errors", { sectionErrors });
+              } else {
+                this.log(
+                  `✅ Completed section: ${chalk.cyan(completedSection)} in ${(sectionDuration / 1000).toFixed(1)}s`
+                );
+              }
+            }
+            break;
+
+          case "notion.object.fetched":
+            // Optional: log individual object fetches in verbose mode
+            break;
+        }
+      },
+      error: (err) => {
+        log.error("Error in domain-events subscription", { error: err });
       }
     });
   }
@@ -703,27 +709,27 @@ export default class Export extends BaseCommand<typeof Export> {
     const exports = new Map();
 
     return {
-      async save(export_: any): Promise<void> {
+      save(export_: any): void {
         exports.set(export_.id, export_);
       },
 
-      async findById(id: string): Promise<any> {
+      findById(id: string): any {
         return exports.get(id) || null;
       },
 
-      async findByStatus(status: string): Promise<any[]> {
+      findByStatus(status: string): any[] {
         return Array.from(exports.values()).filter((exp: any) => exp.status === status);
       },
 
-      async findRunning(): Promise<any[]> {
+      findRunning(): any[] {
         return Array.from(exports.values()).filter((exp: any) => exp.status === "running");
       },
 
-      async delete(id: string): Promise<void> {
+      delete(id: string): void {
         exports.delete(id);
       },
 
-      async list(limit?: number, offset?: number): Promise<any[]> {
+      list(limit?: number, offset?: number): any[] {
         const all = Array.from(exports.values());
         const start = offset || 0;
         const end = limit ? start + limit : all.length;

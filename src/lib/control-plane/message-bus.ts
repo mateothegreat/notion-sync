@@ -4,16 +4,24 @@
  * Provides centralized message routing with RxJS-based channels
  */
 
-import { Subject } from "rxjs";
-import { BusChannel, Channel, Message, MessageHandler, MessageRoutingError, Middleware } from "./types";
+import { EMPTY, merge, Observable, of, Subject, Subscription } from "rxjs";
+import { catchError, map, mergeMap, share, takeUntil, tap } from "rxjs/operators";
+import {
+  Message,
+  MessageRoutingError,
+  Middleware,
+  ObservableChannel,
+  ObservableMessageHandler,
+  OperationResult
+} from "./types";
 
 /**
  * Message bus adapter interface for different backends
  */
 export interface MessageBusAdapter {
-  publish<T>(channel: string, message: Message<T>): Promise<void>;
-  subscribe<T>(channel: string, handler: MessageHandler<T>): Promise<() => void>;
-  close(): Promise<void>;
+  publish<T>(channel: string, message: Message<T>): Observable<void>;
+  subscribe<T>(channel: string): Observable<Message<T>>;
+  close(): Observable<void>;
 }
 
 /**
@@ -21,27 +29,41 @@ export interface MessageBusAdapter {
  */
 export class InMemoryAdapter implements MessageBusAdapter {
   private channels = new Map<string, Subject<Message<any>>>();
+  private destroy$ = new Subject<void>();
 
-  async publish<T>(channel: string, message: Message<T>): Promise<void> {
-    const subject = this.getOrCreateChannel(channel);
-    subject.next(message);
-  }
-
-  async subscribe<T>(channel: string, handler: MessageHandler<T>): Promise<() => void> {
-    const subject = this.getOrCreateChannel(channel);
-    const subscription = subject.subscribe({
-      next: handler,
-      error: (error) => console.error(`Error in channel ${channel}:`, error)
+  publish<T>(channel: string, message: Message<T>): Observable<void> {
+    return new Observable((observer) => {
+      try {
+        const subject = this.getOrCreateChannel(channel);
+        subject.next(message);
+        observer.next();
+        observer.complete();
+      } catch (error) {
+        observer.error(error);
+      }
     });
-
-    return () => subscription.unsubscribe();
   }
 
-  async close(): Promise<void> {
-    for (const subject of this.channels.values()) {
-      subject.complete();
-    }
-    this.channels.clear();
+  subscribe<T>(channel: string): Observable<Message<T>> {
+    const subject = this.getOrCreateChannel(channel);
+    return subject.asObservable().pipe(takeUntil(this.destroy$), share());
+  }
+
+  close(): Observable<void> {
+    return new Observable((observer) => {
+      try {
+        for (const subject of this.channels.values()) {
+          subject.complete();
+        }
+        this.channels.clear();
+        this.destroy$.next();
+        this.destroy$.complete();
+        observer.next();
+        observer.complete();
+      } catch (error) {
+        observer.error(error);
+      }
+    });
   }
 
   private getOrCreateChannel(channel: string): Subject<Message<any>> {
@@ -53,39 +75,38 @@ export class InMemoryAdapter implements MessageBusAdapter {
 }
 
 /**
+ * Observable middleware function
+ */
+export type ObservableMiddleware = (message: Message<any>) => Observable<Message<any>>;
+
+/**
  * Message bus implementation with middleware support
  */
 export class MessageBus {
-  private middleware: Middleware[] = [];
+  private middleware: ObservableMiddleware[] = [];
   private messageCounter = 0;
+  private destroy$ = new Subject<void>();
 
   constructor(private adapter: MessageBusAdapter) {}
 
   /**
    * Add middleware to the message processing pipeline
    */
-  use(middleware: Middleware): void {
+  use(middleware: ObservableMiddleware): void {
     this.middleware.push(middleware);
   }
 
   /**
-   * Create a typed channel for message communication
+   * Create a typed observable channel for message communication
    */
-  channel<T>(name: string): Channel<T> {
+  channel<T>(name: string): ObservableChannel<T> {
     return new MessageBusChannel<T>(name, this);
-  }
-
-  /**
-   * Create a bus channel with promise-based operations
-   */
-  busChannel<T>(name: string): BusChannel<T> {
-    return new PromiseBusChannel<T>(name, this);
   }
 
   /**
    * Publish a message to a channel
    */
-  async publish<T>(channel: string, payload: T, metadata?: Record<string, any>): Promise<void> {
+  publish<T>(channel: string, payload: T, metadata?: Record<string, any>): Observable<OperationResult<void>> {
     const message: Message<T> = {
       id: this.generateMessageId(),
       type: channel,
@@ -94,51 +115,82 @@ export class MessageBus {
       metadata
     };
 
-    try {
-      await this.processMiddleware(message);
-      await this.adapter.publish(channel, message);
-    } catch (error) {
-      throw new MessageRoutingError(`Failed to publish message to channel ${channel}`, message.id, error as Error);
-    }
+    return this.processMiddleware(message).pipe(
+      mergeMap(() => this.adapter.publish(channel, message)),
+      map(() => ({
+        metadata: { messageId: message.id }
+      })),
+      catchError((error) => {
+        const routingError = new MessageRoutingError(
+          `Failed to publish message to channel ${channel}`,
+          message.id,
+          error as Error
+        );
+        return of({
+          error: routingError,
+          metadata: { messageId: message.id }
+        });
+      })
+    );
   }
 
   /**
    * Subscribe to messages on a channel
    */
-  async subscribe<T>(channel: string, handler: MessageHandler<T>): Promise<() => void> {
-    const wrappedHandler: MessageHandler<T> = async (message) => {
-      try {
-        await this.processMiddleware(message);
-        await handler(message);
-      } catch (error) {
-        console.error(`Error processing message ${message.id}:`, error);
-      }
-    };
+  subscribe<T>(channel: string): Observable<Message<T>> {
+    return this.adapter.subscribe<T>(channel).pipe(
+      mergeMap((message) =>
+        this.processMiddleware(message).pipe(
+          map(() => message),
+          catchError((error) => {
+            console.error(`Error processing message ${message.id}:`, error);
+            return EMPTY;
+          })
+        )
+      ),
+      takeUntil(this.destroy$)
+    );
+  }
 
-    return this.adapter.subscribe(channel, wrappedHandler);
+  /**
+   * Subscribe with a handler function
+   */
+  subscribeHandler<T>(channel: string, handler: ObservableMessageHandler<T>): Subscription {
+    return this.subscribe<T>(channel)
+      .pipe(
+        mergeMap((message) =>
+          handler(message).pipe(
+            catchError((error) => {
+              console.error(`Handler error for message ${message.id}:`, error);
+              return EMPTY;
+            })
+          )
+        )
+      )
+      .subscribe();
   }
 
   /**
    * Close the message bus
    */
-  async close(): Promise<void> {
-    await this.adapter.close();
+  close(): Observable<void> {
+    return this.adapter.close().pipe(
+      tap(() => {
+        this.destroy$.next();
+        this.destroy$.complete();
+      })
+    );
   }
 
   /**
    * Process middleware pipeline
    */
-  private async processMiddleware<T>(message: Message<T>): Promise<void> {
-    let index = 0;
+  private processMiddleware<T>(message: Message<T>): Observable<Message<T>> {
+    if (this.middleware.length === 0) {
+      return of(message);
+    }
 
-    const next = async (): Promise<void> => {
-      if (index < this.middleware.length) {
-        const middleware = this.middleware[index++];
-        await middleware(message, next);
-      }
-    };
-
-    await next();
+    return this.middleware.reduce((acc, middleware) => acc.pipe(mergeMap((msg) => middleware(msg))), of(message));
   }
 
   /**
@@ -150,182 +202,144 @@ export class MessageBus {
 }
 
 /**
- * RxJS Subject-based channel implementation
+ * RxJS Observable-based channel implementation
  */
-export class MessageBusChannel<T> implements Channel<T> {
-  private subject = new Subject<T>();
-  private closed = false;
+export class MessageBusChannel<T> implements ObservableChannel<T> {
+  private payloadSubject = new Subject<T>();
+  public messages$: Observable<T>;
+  private destroy$ = new Subject<void>();
+  private subscription?: Subscription;
 
-  private busSubscription?: () => void;
-  private setupPromise?: Promise<void>;
+  constructor(private name: string, private bus: MessageBus) {
+    // Set up the message stream
+    this.messages$ = merge(
+      // Messages from the bus
+      this.bus.subscribe<T>(this.name).pipe(
+        map((message) => message.payload),
+        tap((payload) => this.payloadSubject.next(payload))
+      ),
+      // Local messages
+      this.payloadSubject.asObservable()
+    ).pipe(takeUntil(this.destroy$), share());
 
-  constructor(
-    private name: string,
-    private bus: MessageBus
-  ) {
-    // Subscribe to the message bus once
-    this.setupPromise = this.setupBusSubscription();
-  }
-
-  private async setupBusSubscription() {
-    try {
-      this.busSubscription = await this.bus.subscribe(this.name, (message: Message) => {
-        this.subject.next(message.payload);
-      });
-    } catch (error) {
-      console.error(`Error setting up bus subscription for ${this.name}:`, error);
-    }
-  }
-
-  subscribe(observer: (message: T) => void): { unsubscribe: () => void } {
-    if (this.closed) {
-      throw new Error(`Channel ${this.name} is closed`);
-    }
-
-    const subscription = this.subject.subscribe({
-      next: observer,
+    // Subscribe to keep the stream active
+    this.subscription = this.messages$.subscribe({
       error: (error) => console.error(`Error in channel ${this.name}:`, error)
     });
-
-    return {
-      unsubscribe: () => subscription.unsubscribe()
-    };
   }
 
-  async publish(message: T): Promise<void> {
-    if (this.closed) {
-      throw new Error(`Channel ${this.name} is closed`);
-    }
-
-    // Wait for setup to complete
-    if (this.setupPromise) {
-      await this.setupPromise;
-    }
-
-    await this.bus.publish(this.name, message);
-    this.subject.next(message);
+  send(message: T): void {
+    // Publish to bus and emit locally
+    this.bus
+      .publish(this.name, message)
+      .pipe(
+        tap((result) => {
+          if (!result.error) {
+            this.payloadSubject.next(message);
+          }
+        }),
+        catchError((error) => {
+          console.error(`Error sending message to channel ${this.name}:`, error);
+          return EMPTY;
+        })
+      )
+      .subscribe();
   }
 
   close(): void {
-    this.closed = true;
-    this.subject.complete();
-    if (this.busSubscription) {
-      this.busSubscription();
+    if (this.subscription) {
+      this.subscription.unsubscribe();
     }
+    this.destroy$.next();
+    this.destroy$.complete();
+    this.payloadSubject.complete();
   }
 }
 
 /**
- * Promise-based bus channel implementation
- */
-export class PromiseBusChannel<T> implements BusChannel<T> {
-  private subject = new Subject<T>();
-  private closed = false;
-  private unsubscribeFromBus?: () => void;
-
-  constructor(
-    private name: string,
-    private bus: MessageBus
-  ) {}
-
-  async subscribe(observer: (message: T) => void): Promise<{ unsubscribe: () => void }> {
-    if (this.closed) {
-      throw new Error(`Channel ${this.name} is closed`);
-    }
-
-    const subscription = this.subject.subscribe({
-      next: observer,
-      error: (error) => console.error(`Error in channel ${this.name}:`, error)
-    });
-
-    // Subscribe to the message bus
-    this.unsubscribeFromBus = await this.bus.subscribe(this.name, (message: Message) => {
-      this.subject.next(message.payload);
-    });
-
-    return {
-      unsubscribe: () => {
-        subscription.unsubscribe();
-        if (this.unsubscribeFromBus) {
-          this.unsubscribeFromBus();
-        }
-      }
-    };
-  }
-
-  async publish(message: T): Promise<void> {
-    if (this.closed) {
-      throw new Error(`Channel ${this.name} is closed`);
-    }
-
-    await this.bus.publish(this.name, message);
-  }
-
-  async close(): Promise<void> {
-    this.closed = true;
-    this.subject.complete();
-    if (this.unsubscribeFromBus) {
-      this.unsubscribeFromBus();
-    }
-  }
-}
-
-/**
- * Broker bus implementation following the pseudo-code pattern
+ * Broker bus implementation with pure RxJS
  */
 export class BrokerBus {
   private bus: MessageBus;
+  private channels = new Map<string, Subject<any>>();
+  private destroy$ = new Subject<void>();
 
   constructor(adapter?: MessageBusAdapter) {
     this.bus = new MessageBus(adapter || new InMemoryAdapter());
   }
 
   /**
-   * Create a typed channel
+   * Create a typed observable channel
    */
-  channel<T>(name: string): Subject<T> {
+  channel<T>(name: string): ObservableChannel<T> {
+    return this.bus.channel<T>(name);
+  }
+
+  /**
+   * Create a Subject that's connected to the bus
+   */
+  subject<T>(name: string): Subject<T> {
+    if (this.channels.has(name)) {
+      return this.channels.get(name)!;
+    }
+
     const subject = new Subject<T>();
 
-    // Set up subscription from bus to subject (one-way)
+    // Subscribe to bus messages
     this.bus
-      .subscribe(name, (message: Message) => {
-        subject.next(message.payload);
-      })
-      .catch((error) => {
-        console.error(`Error setting up channel subscription for ${name}:`, error);
+      .subscribe<T>(name)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (message) => subject.next(message.payload),
+        error: (error) => console.error(`Error in channel ${name}:`, error)
       });
 
-    // Override next to publish to bus only (don't emit locally to avoid loop)
+    // Override next to publish to bus
     const originalNext = subject.next.bind(subject);
     subject.next = (value: T) => {
-      this.bus.publish(name, value).catch((error) => {
-        console.error(`Error publishing to channel ${name}:`, error);
-      });
-      // Don't call originalNext here to avoid feedback loop
+      this.bus
+        .publish(name, value)
+        .pipe(
+          catchError((error) => {
+            console.error(`Error publishing to channel ${name}:`, error);
+            return EMPTY;
+          })
+        )
+        .subscribe();
     };
 
+    this.channels.set(name, subject);
     return subject;
   }
 
   /**
    * Add middleware to the bus
    */
-  use(middleware: Middleware): void {
+  use(middleware: ObservableMiddleware): void {
     this.bus.use(middleware);
   }
 
   /**
    * Close the broker bus
    */
-  async close(): Promise<void> {
-    await this.bus.close();
+  close(): Observable<void> {
+    return this.bus.close().pipe(
+      tap(() => {
+        for (const subject of this.channels.values()) {
+          subject.complete();
+        }
+        this.channels.clear();
+        this.destroy$.next();
+        this.destroy$.complete();
+      })
+    );
   }
 }
 
 /**
- * Utility function to provide bus subjects for dependency injection
+ * Utility function to create a channel provider for dependency injection
  */
-export function provideBusSubject<T extends Subject<any>>(channelName: string) {
+export function provideChannel<T>(channelName: string) {
   return {
     provide: channelName,
     useFactory: (bus: BrokerBus) => bus.channel<T>(channelName),
@@ -334,12 +348,33 @@ export function provideBusSubject<T extends Subject<any>>(channelName: string) {
 }
 
 /**
- * Utility function to provide bus channels for dependency injection
+ * Utility function to create a subject provider for dependency injection
  */
-export function provideBusChannel<T extends BusChannel<any>>(channelName: string) {
+export function provideSubject<T>(channelName: string) {
   return {
     provide: channelName,
-    useFactory: (bus: MessageBus) => bus.busChannel<T>(channelName),
-    deps: [MessageBus]
+    useFactory: (bus: BrokerBus) => bus.subject<T>(channelName),
+    deps: [BrokerBus]
+  };
+}
+
+/**
+ * Legacy middleware adapter (converts old middleware to observable)
+ */
+export function adaptLegacyMiddleware(middleware: Middleware): ObservableMiddleware {
+  return (message: Message<any>) => {
+    return new Observable<Message<any>>((observer) => {
+      let completed = false;
+
+      const next = () => {
+        if (!completed) {
+          completed = true;
+          observer.next(message);
+          observer.complete();
+        }
+      };
+
+      Promise.resolve(middleware(message, next)).catch((error) => observer.error(error));
+    });
   };
 }

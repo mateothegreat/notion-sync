@@ -6,6 +6,7 @@
 
 import { ResolvedCommandConfig } from "$lib/config/loader";
 import { ExportFormat } from "$lib/exporters/exporter";
+import { Observable } from "rxjs";
 import { ExportError, ValidationError } from "../../shared/errors";
 import { Entity, ErrorInfo, ExportStatus, ProgressInfo } from "../../shared/types";
 
@@ -228,6 +229,16 @@ export interface ExportRepository {
   list(limit?: number, offset?: number): Promise<Export[]>;
 }
 
+// Observable-based Export Repository Interface
+export interface ObservableExportRepository {
+  save(export_: Export): Observable<void>;
+  findById(id: string): Observable<Export | null>;
+  findByStatus(status: ExportStatus): Observable<Export[]>;
+  findRunning(): Observable<Export[]>;
+  delete(id: string): Observable<void>;
+  list(limit?: number, offset?: number): Observable<Export[]>;
+}
+
 // Export Service Interface
 export interface ExportService {
   createExport(configuration: ResolvedCommandConfig<"export">): Promise<Export>;
@@ -236,4 +247,17 @@ export interface ExportService {
   getExport(id: string): Promise<Export>;
   listExports(limit?: number, offset?: number): Promise<Export[]>;
   getRunningExports(): Promise<Export[]>;
+}
+
+// Observable-based Export Service Interface
+export interface ObservableExportService {
+  createExport(configuration: ResolvedCommandConfig<"export">): Observable<Export>;
+  startExport(id: string): Observable<void>;
+  cancelExport(id: string, reason: string): Observable<void>;
+  getExport(id: string): Observable<Export>;
+  listExports(limit?: number, offset?: number): Observable<Export[]>;
+  getRunningExports(): Observable<Export[]>;
+  // Stream-based methods for real-time updates
+  exportProgress$(id: string): Observable<ProgressInfo>;
+  exportStatus$(id: string): Observable<ExportStatus>;
 }

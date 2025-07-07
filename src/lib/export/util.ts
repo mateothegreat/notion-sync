@@ -1,6 +1,136 @@
 /**
- * Simple promise-based concurrency limiter.
+ * Observable-based concurrency limiter using RxJS.
  *
+ * @example
+ * ```ts
+ * const limiter = new ObservableConcurrencyLimiter(10);
+ * limiter.run(() => from(fetch('https://api.example.com'))).subscribe();
+ * ```
+ */
+
+import { Observable, Subject, from, of, throwError } from "rxjs";
+import { catchError, finalize, mergeMap, tap, timeout } from "rxjs/operators";
+
+export class ObservableConcurrencyLimiter {
+  /**
+   * The number of concurrent operations currently running.
+   */
+  private running = 0;
+
+  /**
+   * The queue of operations waiting to run.
+   */
+  private queue = new Subject<{
+    operation: () => Observable<any>;
+    subject: Subject<any>;
+  }>();
+
+  constructor(private maxConcurrent: number) {
+    // Process queue items
+    this.queue
+      .pipe(
+        mergeMap(({ operation, subject }) => {
+          // Wait until we have capacity
+          return this.waitForCapacity().pipe(
+            mergeMap(() => {
+              this.running++;
+              return operation().pipe(
+                tap({
+                  next: (value) => subject.next(value),
+                  error: (err) => subject.error(err),
+                  complete: () => subject.complete()
+                }),
+                finalize(() => {
+                  this.running--;
+                  subject.complete();
+                }),
+                catchError((err) => {
+                  subject.error(err);
+                  return of(null); // Continue processing queue
+                })
+              );
+            })
+          );
+        })
+      )
+      .subscribe();
+  }
+
+  /**
+   * Runs an operation with the concurrency limiter.
+   *
+   * @param operation - The operation to run.
+   * @param timeoutMs - Optional timeout in milliseconds.
+   * @returns Observable of the operation result.
+   */
+  run<T>(operation: () => Observable<T>, timeoutMs?: number): Observable<T> {
+    const subject = new Subject<T>();
+
+    let wrappedOperation = operation;
+
+    // Add timeout if specified
+    if (timeoutMs) {
+      wrappedOperation = () =>
+        operation().pipe(
+          timeout(timeoutMs),
+          catchError((err) => {
+            if (err.name === "TimeoutError") {
+              return throwError(() => new Error("Operation timed out"));
+            }
+            return throwError(() => err);
+          })
+        );
+    }
+
+    this.queue.next({
+      operation: wrappedOperation as () => Observable<any>,
+      subject: subject as Subject<any>
+    });
+
+    return subject.asObservable();
+  }
+
+  /**
+   * Waits until there is capacity to run another operation.
+   */
+  private waitForCapacity(): Observable<void> {
+    if (this.running < this.maxConcurrent) {
+      return of(undefined);
+    }
+
+    // Poll until capacity is available
+    return new Observable((observer) => {
+      const checkCapacity = () => {
+        if (this.running < this.maxConcurrent) {
+          observer.next();
+          observer.complete();
+        } else {
+          setTimeout(checkCapacity, 10);
+        }
+      };
+      checkCapacity();
+    });
+  }
+
+  /**
+   * Gets the current number of running operations.
+   */
+  getRunningCount(): number {
+    return this.running;
+  }
+
+  /**
+   * Completes the queue and prevents new operations.
+   */
+  complete(): void {
+    this.queue.complete();
+  }
+}
+
+/**
+ * Simple promise-based concurrency limiter (legacy).
+ *
+ * @deprecated Use ObservableConcurrencyLimiter instead
  * @example
  * ```ts
  * const limiter = new ConcurrencyLimiter(10);
@@ -65,10 +195,7 @@ export class RateLimiter {
   private lastRequestTime: number = 0;
   private consecutiveErrors: number = 0;
 
-  constructor(
-    private maxRequestsPerMinute: number = 60,
-    private minInterval: number = 100
-  ) {}
+  constructor(private maxRequestsPerMinute: number = 60, private minInterval: number = 100) {}
 
   /**
    * Wait for rate limit before making a request.
@@ -164,10 +291,7 @@ export class CircuitBreaker {
   private lastFailureTime: number = 0;
   private state: "closed" | "open" | "half-open" = "closed";
 
-  constructor(
-    private failureThreshold: number = 5,
-    private resetTimeout: number = 60000
-  ) {}
+  constructor(private failureThreshold: number = 5, private resetTimeout: number = 60000) {}
 
   /**
    * Check if the circuit breaker allows the operation.
@@ -592,4 +716,11 @@ export class RateTracker {
       return `${rate.toFixed(2)}/s`;
     }
   }
+}
+
+/**
+ * Utility to convert a Promise-based function to an Observable
+ */
+export function fromPromiseFactory<T>(fn: () => Promise<T>): Observable<T> {
+  return from(fn());
 }

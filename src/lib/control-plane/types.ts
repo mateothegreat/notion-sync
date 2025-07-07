@@ -2,7 +2,7 @@
  * Core types for the Control Plane
  */
 
-import { Observable, Subject } from "rxjs";
+import { Observable } from "rxjs";
 
 /**
  * Message types for the control plane
@@ -191,45 +191,64 @@ export interface Serializer {
  * Error types
  */
 export class ControlPlaneError extends Error {
-  constructor(
-    message: string,
-    public code?: string,
-    public cause?: Error
-  ) {
+  constructor(message: string, public code?: string, public cause?: Error) {
     super(message);
     this.name = "ControlPlaneError";
   }
 }
 
 export class MessageRoutingError extends ControlPlaneError {
-  constructor(
-    message: string,
-    public messageId?: string,
-    cause?: Error
-  ) {
+  constructor(message: string, public messageId?: string, cause?: Error) {
     super(message, "MESSAGE_ROUTING_ERROR", cause);
     this.name = "MessageRoutingError";
   }
 }
 
 export class ComponentError extends ControlPlaneError {
-  constructor(
-    message: string,
-    public componentId?: string,
-    cause?: Error
-  ) {
+  constructor(message: string, public componentId?: string, cause?: Error) {
     super(message, "COMPONENT_ERROR", cause);
     this.name = "ComponentError";
   }
 }
 
 export class CircuitBreakerError extends ControlPlaneError {
-  constructor(
-    message: string,
-    public operation?: string,
-    cause?: Error
-  ) {
+  constructor(message: string, public operation?: string, cause?: Error) {
     super(message, "CIRCUIT_BREAKER_ERROR", cause);
     this.name = "CircuitBreakerError";
   }
+}
+
+/**
+ * Observable-based handler types
+ */
+export type ObservableMessageHandler<T = any> = (message: Message<T>) => Observable<void>;
+export type ObservableCommandHandler<T = any> = (command: Command<T>) => Observable<void>;
+export type ObservableEventHandler<T = any> = (event: Event<T>) => Observable<void>;
+
+/**
+ * Observable-based channel interface
+ */
+export interface ObservableChannel<T = any> {
+  messages$: Observable<T>;
+  send(message: T): void;
+  close(): void;
+}
+
+/**
+ * Event-driven operation result
+ */
+export interface OperationResult<T = any> {
+  data?: T;
+  error?: Error;
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Stream processing options
+ */
+export interface StreamOptions {
+  bufferSize?: number;
+  bufferTime?: number;
+  throttleTime?: number;
+  debounceTime?: number;
 }

@@ -4,23 +4,32 @@
  * Orchestrates all control plane components and provides the main API
  */
 
-import { Subject } from "rxjs";
+import { EMPTY, Observable, Subject, from, of, throwError } from "rxjs";
+import { catchError, map, mergeMap, tap } from "rxjs/operators";
 import { CircuitBreakerRegistry } from "./circuit-breaker";
 import { ComponentFactory } from "./component-factory";
 import { HookManager } from "./hooks";
-import { BrokerBus, InMemoryAdapter, MessageBus, MessageBusAdapter } from "./message-bus";
+import {
+  BrokerBus,
+  InMemoryAdapter,
+  MessageBus,
+  MessageBusAdapter,
+  ObservableMiddleware,
+  adaptLegacyMiddleware
+} from "./message-bus";
 import { MiddlewarePipeline } from "./middleware";
 import { PluginContext, PluginRegistry } from "./plugins";
 import { StateRegistry } from "./state-registry";
 import {
-  BusChannel,
-  Channel,
   Component,
   ComponentConfig,
   HookFunction,
   HookType,
   Message,
   Middleware,
+  ObservableChannel,
+  ObservableMessageHandler,
+  OperationResult,
   Plugin
 } from "./types";
 
@@ -74,203 +83,227 @@ export class ControlPlane {
 
     this.pluginRegistry = new PluginRegistry(pluginContext);
 
-    // Set up middleware pipeline integration
-    this.messageBus.use(async (message, next) => {
-      try {
-        await this.middlewarePipeline.execute(message);
-        await next();
-      } catch (error) {
-        await this.hookManager.execute("error", { error, message });
-        throw error;
-      }
-    });
+    // Set up middleware pipeline integration with Observable middleware
+    const observableMiddleware: ObservableMiddleware = (message) => {
+      return from(this.middlewarePipeline.execute(message)).pipe(
+        map(() => message),
+        catchError((error): Observable<never> => {
+          // Execute error hook asynchronously
+          this.hookManager.execute("error", { error, message }).catch(console.error);
+          return throwError(() => error);
+        })
+      );
+    };
+
+    this.messageBus.use(observableMiddleware);
   }
 
   /**
    * Initialize the control plane
    */
-  async initialize(): Promise<void> {
+  initialize(): Observable<void> {
     if (this.initialized) {
-      return;
+      return of(undefined);
     }
 
-    try {
-      await this.hookManager.execute("before-message", { phase: "initialize" });
+    return from(this.hookManager.execute("before-message", { phase: "initialize" })).pipe(
+      mergeMap(() => {
+        const initTasks: Observable<any>[] = [];
 
-      // Install built-in plugins if enabled
-      if (this.config.enableLogging) {
-        const { LoggingPlugin } = await import("./plugins");
-        this.pluginRegistry.register(new LoggingPlugin());
-        await this.pluginRegistry.install("logging");
-      }
+        // Install built-in plugins if enabled
+        if (this.config.enableLogging) {
+          initTasks.push(
+            from(import("./plugins")).pipe(
+              mergeMap(({ LoggingPlugin }): Observable<void> => {
+                this.pluginRegistry.register(new LoggingPlugin());
+                return from(this.pluginRegistry.install("logging"));
+              })
+            )
+          );
+        }
 
-      if (this.config.enableMetrics) {
-        const { MetricsPlugin } = await import("./plugins");
-        this.pluginRegistry.register(new MetricsPlugin());
-        await this.pluginRegistry.install("metrics");
-      }
+        if (this.config.enableMetrics) {
+          initTasks.push(
+            from(import("./plugins")).pipe(
+              mergeMap(({ MetricsPlugin }) => {
+                this.pluginRegistry.register(new MetricsPlugin());
+                return from(this.pluginRegistry.install("metrics"));
+              })
+            )
+          );
+        }
 
-      if (this.config.enableHealthCheck) {
-        const { HealthCheckPlugin } = await import("./plugins");
-        this.pluginRegistry.register(new HealthCheckPlugin());
-        await this.pluginRegistry.install("health-check");
-      }
+        if (this.config.enableHealthCheck) {
+          initTasks.push(
+            from(import("./plugins")).pipe(
+              mergeMap(({ HealthCheckPlugin }) => {
+                this.pluginRegistry.register(new HealthCheckPlugin());
+                return from(this.pluginRegistry.install("health-check"));
+              })
+            )
+          );
+        }
 
-      // Initialize all components if auto-start is enabled
-      if (this.config.autoStartComponents) {
-        await this.componentFactory.initializeAll();
-      }
+        // Initialize all components if auto-start is enabled
+        if (this.config.autoStartComponents) {
+          initTasks.push(from(this.componentFactory.initializeAll()));
+        }
 
-      this.initialized = true;
-
-      await this.hookManager.execute("after-message", { phase: "initialize" });
-    } catch (error) {
-      await this.hookManager.execute("error", { error, phase: "initialize" });
-      throw error;
-    }
+        return initTasks.length > 0 ? from(Promise.all(initTasks)) : of(undefined);
+      }),
+      tap(() => {
+        this.initialized = true;
+      }),
+      mergeMap(() => from(this.hookManager.execute("after-message", { phase: "initialize" }))),
+      catchError((error): Observable<never> => {
+        this.hookManager.execute("error", { error, phase: "initialize" }).catch(console.error);
+        return throwError(() => error);
+      })
+    );
   }
 
   /**
    * Start the control plane
    */
-  async start(): Promise<void> {
-    if (!this.initialized) {
-      await this.initialize();
-    }
+  start(): Observable<void> {
+    return (!this.initialized ? this.initialize() : of(undefined)).pipe(
+      mergeMap(() => {
+        if (this.started) {
+          return of(undefined);
+        }
 
-    if (this.started) {
-      return;
-    }
-
-    try {
-      await this.hookManager.execute("before-message", { phase: "start" });
-
-      // Start all components if auto-start is enabled
-      if (this.config.autoStartComponents) {
-        await this.componentFactory.startAll();
-      }
-
-      this.started = true;
-
-      await this.hookManager.execute("after-message", { phase: "start" });
-    } catch (error) {
-      await this.hookManager.execute("error", { error, phase: "start" });
-      throw error;
-    }
+        return from(this.hookManager.execute("before-message", { phase: "start" })).pipe(
+          mergeMap(() => {
+            if (this.config.autoStartComponents) {
+              return from(this.componentFactory.startAll());
+            }
+            return of(undefined);
+          }),
+          tap(() => {
+            this.started = true;
+          }),
+          mergeMap(() => from(this.hookManager.execute("after-message", { phase: "start" }))),
+          catchError((error) => {
+            this.hookManager.execute("error", { error, phase: "start" }).catch(console.error);
+            return throwError(() => error);
+          }),
+          map(() => undefined)
+        );
+      })
+    );
   }
 
   /**
    * Stop the control plane
    */
-  async stop(): Promise<void> {
+  stop(): Observable<void> {
     if (!this.started) {
-      return;
+      return of(undefined);
     }
 
-    try {
-      await this.hookManager.execute("before-message", { phase: "stop" });
-
-      // Stop all components
-      await this.componentFactory.stopAll();
-
-      // Close message bus
-      await this.messageBus.close();
-      await this.brokerBus.close();
-
-      this.started = false;
-
-      await this.hookManager.execute("after-message", { phase: "stop" });
-    } catch (error) {
-      await this.hookManager.execute("error", { error, phase: "stop" });
-      throw error;
-    }
+    return from(this.hookManager.execute("before-message", { phase: "stop" })).pipe(
+      mergeMap(() => from(this.componentFactory.stopAll())),
+      mergeMap(() => this.messageBus.close()),
+      mergeMap(() => this.brokerBus.close()),
+      tap(() => {
+        this.started = false;
+      }),
+      mergeMap(() => from(this.hookManager.execute("after-message", { phase: "stop" }))),
+      catchError((error) => {
+        this.hookManager.execute("error", { error, phase: "stop" }).catch(console.error);
+        return throwError(() => error);
+      }),
+      map(() => undefined)
+    );
   }
 
   /**
    * Destroy the control plane
    */
-  async destroy(): Promise<void> {
-    if (this.started) {
-      await this.stop();
-    }
-
-    try {
-      await this.hookManager.execute("before-message", { phase: "destroy" });
-
-      // Destroy all components
-      await this.componentFactory.destroyAll();
-
-      // Uninstall all plugins
-      await this.pluginRegistry.uninstallAll();
-
-      // Clear all state
-      this.stateRegistry.clear();
-      this.middlewarePipeline.clear();
-      this.hookManager.clear();
-
-      this.initialized = false;
-
-      await this.hookManager.execute("after-message", { phase: "destroy" });
-    } catch (error) {
-      await this.hookManager.execute("error", { error, phase: "destroy" });
-      throw error;
-    }
+  destroy(): Observable<void> {
+    return (this.started ? this.stop() : of(undefined)).pipe(
+      mergeMap(() => from(this.hookManager.execute("before-message", { phase: "destroy" }))),
+      mergeMap(() => from(this.componentFactory.destroyAll())),
+      mergeMap(() => from(this.pluginRegistry.uninstallAll())),
+      tap(() => {
+        // Clear all state
+        this.stateRegistry.clear();
+        this.middlewarePipeline.clear();
+        this.hookManager.clear();
+        this.initialized = false;
+      }),
+      mergeMap(() => from(this.hookManager.execute("after-message", { phase: "destroy" }))),
+      catchError((error) => {
+        this.hookManager.execute("error", { error, phase: "destroy" }).catch(console.error);
+        return throwError(() => error);
+      }),
+      map(() => undefined)
+    );
   }
 
   // Message Bus API
 
   /**
-   * Create a typed channel
+   * Create a typed observable channel
    */
-  channel<T>(name: string): Channel<T> {
+  channel<T>(name: string): ObservableChannel<T> {
     return this.messageBus.channel<T>(name);
-  }
-
-  /**
-   * Create a bus channel with promise-based operations
-   */
-  busChannel<T>(name: string): BusChannel<T> {
-    return this.messageBus.busChannel<T>(name);
   }
 
   /**
    * Create a broker bus channel (RxJS Subject)
    */
   brokerChannel<T>(name: string): Subject<T> {
-    return this.brokerBus.channel<T>(name);
+    return this.brokerBus.subject<T>(name);
   }
 
   /**
    * Publish a message
    */
-  async publish<T>(channel: string, payload: T, metadata?: Record<string, any>): Promise<void> {
-    await this.hookManager.execute("before-message", { channel, payload, metadata });
-
-    try {
-      await this.messageBus.publish(channel, payload, metadata);
-      await this.hookManager.execute("after-message", { channel, payload, metadata });
-    } catch (error) {
-      await this.hookManager.execute("error", { error, channel, payload, metadata });
-      throw error;
-    }
+  publish<T>(channel: string, payload: T, metadata?: Record<string, any>): Observable<OperationResult<void>> {
+    return from(this.hookManager.execute("before-message", { channel, payload, metadata })).pipe(
+      mergeMap(() => this.messageBus.publish(channel, payload, metadata)),
+      tap((result) => {
+        if (!result.error) {
+          this.hookManager.execute("after-message", { channel, payload, metadata }).catch(console.error);
+        }
+      }),
+      catchError((error) => {
+        this.hookManager.execute("error", { error, channel, payload, metadata }).catch(console.error);
+        return of({ error, metadata: { channel } });
+      })
+    );
   }
 
   /**
    * Subscribe to messages
    */
-  async subscribe<T>(channel: string, handler: (message: Message<T>) => void | Promise<void>): Promise<() => void> {
-    const wrappedHandler = async (message: Message<T>) => {
-      try {
-        await this.hookManager.execute("before-message", { message });
-        await handler(message);
-        await this.hookManager.execute("after-message", { message });
-      } catch (error) {
-        await this.hookManager.execute("error", { error, message });
-        throw error;
-      }
-    };
+  subscribe<T>(channel: string): Observable<Message<T>> {
+    return this.messageBus.subscribe<T>(channel).pipe(
+      mergeMap((message) =>
+        from(this.hookManager.execute("before-message", { message })).pipe(
+          map(() => message),
+          catchError((error) => {
+            console.error("Hook error:", error);
+            return of(message);
+          })
+        )
+      ),
+      tap((message) => {
+        this.hookManager.execute("after-message", { message }).catch(console.error);
+      }),
+      catchError((error) => {
+        this.hookManager.execute("error", { error }).catch(console.error);
+        return EMPTY;
+      })
+    );
+  }
 
-    return this.messageBus.subscribe(channel, wrappedHandler);
+  /**
+   * Subscribe with a handler
+   */
+  subscribeWithHandler<T>(channel: string, handler: ObservableMessageHandler<T>) {
+    return this.messageBus.subscribeHandler(channel, handler);
   }
 
   // State Management API
@@ -322,8 +355,8 @@ export class ControlPlane {
   /**
    * Create a component
    */
-  async createComponent(name: string, ...args: any[]): Promise<Component> {
-    return this.componentFactory.create(name, ...args);
+  createComponent(name: string, ...args: any[]): Observable<Component> {
+    return from(this.componentFactory.create(name, ...args));
   }
 
   /**
@@ -336,15 +369,15 @@ export class ControlPlane {
   /**
    * Start a component
    */
-  async startComponent(nameOrId: string): Promise<void> {
-    await this.componentFactory.start(nameOrId);
+  startComponent(nameOrId: string): Observable<void> {
+    return from(this.componentFactory.start(nameOrId));
   }
 
   /**
    * Stop a component
    */
-  async stopComponent(nameOrId: string): Promise<void> {
-    await this.componentFactory.stop(nameOrId);
+  stopComponent(nameOrId: string): Observable<void> {
+    return from(this.componentFactory.stop(nameOrId));
   }
 
   // Circuit Breaker API
@@ -368,12 +401,26 @@ export class ControlPlane {
   /**
    * Add middleware
    */
-  use(middleware: Middleware): void {
-    // Wrap the simple middleware to match EnhancedMiddleware signature
-    const enhancedMiddleware = async (message: Message, context: any, next: () => void | Promise<void>) => {
-      await middleware(message, next);
-    };
-    this.middlewarePipeline.use(enhancedMiddleware);
+  use(middleware: Middleware | ObservableMiddleware): void {
+    // Check if it's an Observable middleware
+    if (middleware.length === 1) {
+      this.messageBus.use(middleware as ObservableMiddleware);
+    } else {
+      // Convert legacy middleware to Observable middleware
+      this.messageBus.use(adaptLegacyMiddleware(middleware as Middleware));
+    }
+
+    // Also add to middleware pipeline for backward compatibility
+    if (middleware.length === 2) {
+      const enhancedMiddleware = async (
+        message: Message,
+        context: any,
+        next: () => void | Promise<void>
+      ): Promise<void> => {
+        await (middleware as Middleware)(message, next);
+      };
+      this.middlewarePipeline.use(enhancedMiddleware);
+    }
   }
 
   // Plugin API
@@ -388,15 +435,15 @@ export class ControlPlane {
   /**
    * Install a plugin
    */
-  async installPlugin(name: string): Promise<void> {
-    await this.pluginRegistry.install(name);
+  installPlugin(name: string): Observable<void> {
+    return from(this.pluginRegistry.install(name));
   }
 
   /**
    * Uninstall a plugin
    */
-  async uninstallPlugin(name: string): Promise<void> {
-    await this.pluginRegistry.uninstall(name);
+  uninstallPlugin(name: string): Observable<void> {
+    return from(this.pluginRegistry.uninstall(name));
   }
 
   /**
@@ -425,8 +472,8 @@ export class ControlPlane {
   /**
    * Execute hooks
    */
-  async executeHooks(type: HookType, context?: any): Promise<void> {
-    await this.hookManager.execute(type, context);
+  executeHooks(type: HookType, context?: any): Observable<void> {
+    return from(this.hookManager.execute(type, context));
   }
 
   // Utility API
