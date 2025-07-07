@@ -9,12 +9,8 @@ import { promises as fs } from "fs";
 import path from "path";
 import { inspect } from "util";
 
-import {
-  compileCommandConfig,
-  config as configLoaded,
-  createCommandFlags,
-  ResolvedCommandConfig
-} from "$lib/config/config-loader";
+import { exportFlags } from "$lib/config/export-config";
+import { loadExportCommandConfig, ExportCommandConfig } from "$lib/config/config-combiner";
 import { ProgressService } from "../core/services/progress-service";
 import { FileSystemManager } from "../infrastructure/filesystem/file-system-manager";
 import { NotionClient } from "../infrastructure/notion/notion-client";
@@ -33,43 +29,35 @@ export default class Export extends BaseCommand<typeof Export> {
   ];
 
   /**
-   * Export-specific flags extracted dynamically based on command name.
-   * This automatically includes all global flags (*) and export-specific flags.
+   * Export-specific flags combined with base flags from BaseCommand
    */
-  static override flags = createCommandFlags("export");
+  static override flags = exportFlags;
 
   private controlPlane?: ControlPlane;
   private exportService?: ExportService;
   private progressService?: ProgressService;
   private notionClient?: NotionClient;
   private fileSystemManager: FileSystemManager;
-  private resolvedConfig: ResolvedCommandConfig<"export">;
+  private resolvedConfig: ExportCommandConfig;
 
   public async run(): Promise<void> {
-    const { args, flags } = await this.parse<
-      ResolvedCommandConfig<"export">,
-      (typeof Export)["flags"],
-      (typeof Export)["args"]
-    >(Export);
+    const { flags } = await this.parse(Export);
 
-    // Compile configuration with proper typing
-    this.resolvedConfig = compileCommandConfig("export", flags);
+    // Load configuration with proper typing
+    this.resolvedConfig = await loadExportCommandConfig(flags);
 
     try {
       // Parse databases and pages
       let databases: string[] = [];
       let pages: string[] = [];
 
-      if (flags.databases) {
-        // If provided via CLI, parse comma-separated string.
-        databases = flags.databases.split(",").map((id: string) => id.trim());
-      } else if (configLoaded.databases && configLoaded.databases.length > 0) {
-        // If not provided, use databases from config file.
-        databases = configLoaded.databases.map((db: { name: string; id: string }) => db.id);
+      if (this.resolvedConfig.databases && this.resolvedConfig.databases.length > 0) {
+        // Use databases from configuration
+        databases = this.resolvedConfig.databases.map(db => db.id);
       }
 
-      if (flags.pages) {
-        pages = flags.pages.split(",").map((id: string) => id.trim());
+      if (this.resolvedConfig.pages) {
+        pages = this.resolvedConfig.pages.split(",").map((id: string) => id.trim());
       }
 
       // Initialize services first to have access to NotionClient
@@ -90,26 +78,33 @@ export default class Export extends BaseCommand<typeof Export> {
       }
 
       // Create output directory.
-      const outputPath = path.resolve(flags.path);
+      const outputPath = path.resolve(this.resolvedConfig.path);
       await fs.mkdir(outputPath, { recursive: true });
 
       this.log(chalk.blue("🚀 Notion Sync - Event-Driven Architecture"));
       this.log(chalk.gray("━".repeat(50)));
       this.log(`📁 Output: ${chalk.yellow(outputPath)}`);
-      this.log(`🔄 Max Concurrency: ${chalk.yellow(flags["max-concurrency"])}`);
-      this.log(`📦 Format: ${chalk.yellow(flags.format)}`);
+      this.log(`🔄 Max Concurrency: ${chalk.yellow(this.resolvedConfig["max-concurrency"])}`);
+      this.log(`📦 Format: ${chalk.yellow(this.resolvedConfig.format)}`);
       this.log(chalk.gray("━".repeat(50)));
 
       // Set up progress monitoring.
       this.setupProgressMonitoring();
 
       // Create export configuration.
+      // Convert format string to ExportFormat enum
+      const formatMap: Record<string, ExportFormat> = {
+        'json': ExportFormat.JSON,
+        'markdown': ExportFormat.MARKDOWN,
+        'html': ExportFormat.HTML,
+        'csv': ExportFormat.CSV
+      };
       const exportConfiguration: ExportConfiguration = {
         outputPath,
-        format: flags.format as ExportFormat,
-        includeBlocks: flags["include-blocks"],
-        includeComments: flags["include-comments"],
-        includeProperties: flags["include-properties"],
+        format: formatMap[this.resolvedConfig.format] || ExportFormat.JSON,
+        includeBlocks: this.resolvedConfig["include-blocks"],
+        includeComments: this.resolvedConfig["include-comments"],
+        includeProperties: this.resolvedConfig["include-properties"],
         databases,
         pages
       };
@@ -120,7 +115,7 @@ export default class Export extends BaseCommand<typeof Export> {
       this.log(chalk.green("\n✅ Export completed successfully!"));
       this.log(`📁 Files saved to: ${chalk.yellow(outputPath)}`);
     } catch (error) {
-      if (flags.verbose) {
+      if (this.resolvedConfig.verbose) {
         log.error("Export error details", { error: inspect(error, { colors: true, compact: false }) });
       }
 
@@ -716,7 +711,14 @@ export default class Export extends BaseCommand<typeof Export> {
     }
 
     try {
-      const format = this.resolvedConfig.format;
+      // Convert format string to ExportFormat enum
+      const formatMap: Record<string, ExportFormat> = {
+        'json': ExportFormat.JSON,
+        'markdown': ExportFormat.MARKDOWN,
+        'html': ExportFormat.HTML,
+        'csv': ExportFormat.CSV
+      };
+      const format = formatMap[this.resolvedConfig.format] || ExportFormat.JSON;
       let filePath: string;
 
       switch (type) {
