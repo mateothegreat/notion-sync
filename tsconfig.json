@@ -5,7 +5,7 @@
     "rootDir": "./src",
     "outDir": "./dist",
     "module": "esnext",
-    "moduleResolution": "bundler",
+    "moduleResolution": "node",
     "noEmit": false,
     "strict": true,
     "strictNullChecks": false,
@@ -13,8 +13,8 @@
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "paths": {
-      "$lib": ["./src/lib"],
-      "$lib/*": ["./src/lib/*"]
+      "$lib/*": ["./src/lib/*"],
+      "$core/*": ["./src/core/*"]
     }
   },
   "include": ["./src/**/*"],

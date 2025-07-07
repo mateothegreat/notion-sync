@@ -1,6 +1,6 @@
-import { createCommandFlags } from "$lib/config-loader";
+import { createCommandFlags } from "$lib/config/config-loader";
 import { Command, Interfaces } from "@oclif/core";
-import { Flag } from "@oclif/core/interfaces";
+import { Flag } from "@oclif/core/lib/interfaces";
 
 export type Flags<T extends typeof Command> = Interfaces.InferredFlags<(typeof BaseCommand)["baseFlags"] & T["flags"]>;
 export type Args<T extends typeof Command> = Interfaces.InferredArgs<T["args"]>;

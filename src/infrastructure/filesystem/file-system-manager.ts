@@ -351,6 +351,7 @@ export class FileSystemManager {
       return {
         success: false,
         filePath: outputPath,
+        fileSize: 0,
         error: error as Error,
         duration: 0
       };

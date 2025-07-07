@@ -9,13 +9,18 @@ import { promises as fs } from "fs";
 import path from "path";
 import { inspect } from "util";
 
-import { compileConfig, Config, config as configLoaded, createCommandFlags } from "$lib/config-loader";
-import { ExportService } from "../core/services/export-service";
+import {
+  compileCommandConfig,
+  config as configLoaded,
+  createCommandFlags,
+  ResolvedCommandConfig
+} from "$lib/config/config-loader";
 import { ProgressService } from "../core/services/progress-service";
 import { FileSystemManager } from "../infrastructure/filesystem/file-system-manager";
 import { NotionClient } from "../infrastructure/notion/notion-client";
 import { BaseCommand } from "../lib/commands/base-command";
 import { ControlPlane, createControlPlane } from "../lib/control-plane/control-plane";
+import { ExportService } from "../lib/export/export-service";
 import { ExportConfiguration, ExportFormat, NotionConfig } from "../shared/types";
 
 export default class Export extends BaseCommand<typeof Export> {
@@ -38,16 +43,22 @@ export default class Export extends BaseCommand<typeof Export> {
   private progressService?: ProgressService;
   private notionClient?: NotionClient;
   private fileSystemManager: FileSystemManager;
-  private resolvedConfig: any;
+  private resolvedConfig: ResolvedCommandConfig<"export">;
 
   public async run(): Promise<void> {
-    const { args, flags } = await this.parse<Config, (typeof Export)["flags"], (typeof Export)["args"]>(Export);
+    const { args, flags } = await this.parse<
+      ResolvedCommandConfig<"export">,
+      (typeof Export)["flags"],
+      (typeof Export)["args"]
+    >(Export);
 
-    this.resolvedConfig = compileConfig(flags);
+    // Compile configuration with proper typing
+    this.resolvedConfig = compileCommandConfig("export", flags);
 
     try {
       // Parse databases and pages
-      let databases: string[];
+      let databases: string[] = [];
+      let pages: string[] = [];
 
       if (flags.databases) {
         // If provided via CLI, parse comma-separated string.
@@ -55,14 +66,27 @@ export default class Export extends BaseCommand<typeof Export> {
       } else if (configLoaded.databases && configLoaded.databases.length > 0) {
         // If not provided, use databases from config file.
         databases = configLoaded.databases.map((db: { name: string; id: string }) => db.id);
-      } else {
-        databases = [];
       }
 
-      const pages = flags.pages ? flags.pages.split(",").map((id: string) => id.trim()) : [];
+      if (flags.pages) {
+        pages = flags.pages.split(",").map((id: string) => id.trim());
+      }
 
+      // Initialize services first to have access to NotionClient
+      await this.initializeServices();
+
+      // If no specific databases or pages are specified, discover all content
       if (databases.length === 0 && pages.length === 0) {
-        this.error("At least one database or page must be specified");
+        this.log(chalk.cyan("🔍 Discovering all workspace content..."));
+        const discovered = await this.discoverAllContent();
+        databases = discovered.databases;
+        pages = discovered.pages;
+
+        this.log(`📊 Found ${databases.length} databases and ${pages.length} standalone pages`);
+
+        if (databases.length === 0 && pages.length === 0) {
+          this.error("No content found in the workspace to export");
+        }
       }
 
       // Create output directory.
@@ -75,9 +99,6 @@ export default class Export extends BaseCommand<typeof Export> {
       this.log(`🔄 Max Concurrency: ${chalk.yellow(flags["max-concurrency"])}`);
       this.log(`📦 Format: ${chalk.yellow(flags.format)}`);
       this.log(chalk.gray("━".repeat(50)));
-
-      // Initialize control plane and services.
-      await this.initializeServices();
 
       // Set up progress monitoring.
       this.setupProgressMonitoring();
@@ -160,7 +181,7 @@ export default class Export extends BaseCommand<typeof Export> {
     /**
      * Create notion client for fetching data from the Notion API.
      */
-    this.notionClient = new NotionClient(notionConfig, eventPublisher, circuitBreaker);
+    this.notionClient = new NotionClient(notionConfig);
 
     /**
      * Create progress service.
@@ -314,154 +335,94 @@ export default class Export extends BaseCommand<typeof Export> {
       throw new Error("Services not initialized");
     }
 
-    /**
-     * Create export.
-     * This is used to create the export.
-     */
-    this.log("📝 Creating export job...");
-    const export_ = await this.exportService.createExport(configuration);
-    this.log(`✅ Export created with ID: ${chalk.cyan(export_.id)}`);
+    const export_ = await this.exportService.create(configuration);
 
-    /**
-     * Start progress tracking.
-     * This is used to track the progress of the export.
-     */
     await this.progressService.startTracking(export_.id);
 
-    /**
-     * Start export.
-     * This is used to start the export process.
-     */
-    this.log("🚀 Starting export...");
+    log.success("🚀 Starting export...");
+
     await this.exportService.startExport(export_.id);
 
-    // Export workspace metadata
     await this.exportWorkspaceMetadata(export_.id, configuration.outputPath);
 
-    // Export users
     await this.exportUsers(export_.id, configuration.outputPath);
 
-    /**
-     * Process databases.
-     * This is used to process the databases for export.
-     */
     if (configuration.databases.length > 0) {
       await this.processDatabases(export_.id, configuration.databases);
     }
 
-    /**
-     * Process pages.
-     * This is used to process the pages for export.
-     */
     if (configuration.pages.length > 0) {
       await this.processPages(export_.id, configuration.pages);
     }
 
-    /**
-     * Complete export.
-     * This is used to complete the export process.
-     */
     await this.exportService.completeExport(export_.id, configuration.outputPath);
     this.progressService.stopTracking(export_.id);
   }
 
   /**
-   * Process databases for export.
+   * Discover all databases and standalone pages in the workspace.
    */
-  private async processDatabases(exportId: string, databaseIds: string[]): Promise<void> {
-    if (!this.notionClient || !this.progressService) return;
-
-    // First, get total count of databases + estimate pages for progress tracking
-    let totalItems = databaseIds.length;
-    const databasePageCounts: { [databaseId: string]: number } = {};
-
-    // Get a rough estimate of total pages for better progress tracking
-    for (const databaseId of databaseIds) {
-      try {
-        // Query first page to get an idea of total pages
-        const firstQuery = await this.notionClient.queryDatabase(databaseId, { page_size: 1 });
-        // For now, we'll just count what we can see, but in a real implementation
-        // you might want to paginate through all results to get exact count
-        databasePageCounts[databaseId] = 0; // We'll count as we go
-      } catch (error) {
-        databasePageCounts[databaseId] = 0;
-      }
+  private async discoverAllContent(): Promise<{ databases: string[]; pages: string[] }> {
+    if (!this.notionClient) {
+      throw new Error("NotionClient not initialized");
     }
 
-    await this.progressService.startSection(exportId, "databases", totalItems);
+    const databases: string[] = [];
+    const pages: string[] = [];
+    const processedPageIds = new Set<string>();
 
-    for (const databaseId of databaseIds) {
-      try {
-        // 1. First export the database metadata
-        const database = await this.notionClient.getDatabase(databaseId);
-        await this.writeToOutput(database, "database");
+    try {
+      // Discover all databases
+      this.log("🔍 Searching for databases...");
+      const allDatabases = await this.notionClient.getDatabases();
 
-        // 2. Then export all pages in the database
-        let hasMore = true;
-        let nextCursor: string | undefined = undefined;
-        let pageCount = 0;
+      for (const database of allDatabases) {
+        databases.push(database.id);
+        this.log(`  📊 Found database: ${database.title || database.id}`);
+      }
 
-        while (hasMore) {
-          try {
-            const queryResult = await this.notionClient.queryDatabase(databaseId, {
-              start_cursor: nextCursor,
-              page_size: 100 // Process in batches of 100
-            });
+      // Discover all pages (including those not in databases)
+      this.log("🔍 Searching for standalone pages...");
 
-            // Export each page
-            for (const page of queryResult.results) {
-              await this.writeToOutput(page, "page");
-              pageCount++;
-            }
+      // Use search API to find all pages
+      let hasMore = true;
+      let nextCursor: string | undefined = undefined;
 
-            hasMore = queryResult.hasMore;
-            nextCursor = queryResult.nextCursor;
+      while (hasMore) {
+        const searchResult = await this.notionClient.search("", {
+          filter: {
+            property: "object",
+            value: "page"
+          },
+          start_cursor: nextCursor,
+          page_size: 100
+        });
 
-            // Update progress with page count
-            if (queryResult.results.length > 0) {
-              this.log(
-                `📄 Exported ${queryResult.results.length} pages from database: ${database.title || databaseId}`
-              );
-            }
-          } catch (pageError) {
-            this.log(
-              `⚠️ Failed to query pages from database ${databaseId}: ${
-                pageError instanceof Error ? pageError.message : "Unknown error"
-              }`
-            );
-            break; // Stop processing this database's pages but continue with the database
+        for (const page of searchResult.results || []) {
+          // Only add pages that are not already in our databases
+          // Pages in databases will be exported when we process the databases
+          if (page.parent?.type !== "database_id" && !processedPageIds.has(page.id)) {
+            pages.push(page.id);
+            processedPageIds.add(page.id);
+            this.log(`  📄 Found standalone page: ${page.title || page.id}`);
           }
         }
 
-        this.log(`📊 Database ${database.title || databaseId}: exported metadata + ${pageCount} pages`);
-        await this.progressService.updateSectionProgress(exportId, "databases", 1);
-
-        // Export database properties
-        const properties = await this.notionClient.getDatabaseProperties(databaseId);
-        if (properties.length > 0) {
-          await this.fileSystemManager.writeRawData(
-            properties,
-            `${configuration.outputPath}/properties/${databaseId}-properties.json`
-          );
-        }
-      } catch (error) {
-        const errorInfo = {
-          id: crypto.randomUUID(),
-          message: error instanceof Error ? error.message : "Unknown error",
-          code: "DATABASE_FETCH_ERROR",
-          timestamp: new Date(),
-          context: { databaseId }
-        };
-
-        await this.progressService.addError(exportId, "databases", errorInfo);
+        hasMore = searchResult.has_more || false;
+        nextCursor = searchResult.next_cursor || undefined;
+      }
+    } catch (error) {
+      this.log(chalk.yellow("⚠️  Failed to discover all content, falling back to configured items"));
+      if (this.resolvedConfig.verbose) {
+        log.error("Content discovery error", { error });
       }
     }
 
-    await this.progressService.completeSection(exportId, "databases");
+    return { databases, pages };
   }
 
   /**
-   * Process pages for export.
+   * Process pages for export with enhanced data collection.
    */
   private async processPages(exportId: string, pageIds: string[]): Promise<void> {
     if (!this.notionClient || !this.progressService) return;
@@ -475,28 +436,64 @@ export default class Export extends BaseCommand<typeof Export> {
         // Write page to output
         await this.writeToOutput(page, "page");
 
-        // Export comments
-        const comments = await this.notionClient.getComments(pageId);
-        if (comments.length > 0) {
-          await this.fileSystemManager.writeRawData(
-            comments,
-            `${configuration.outputPath}/comments/${pageId}-comments.json`
-          );
+        // Export comments if enabled
+        if (this.resolvedConfig["include-comments"]) {
+          try {
+            const comments = await this.notionClient.getComments(pageId);
+            if (comments.length > 0) {
+              await this.fileSystemManager.writeRawData(
+                comments,
+                path.join(this.resolvedConfig.path, "comments", `${pageId}-comments.json`)
+              );
+              this.log(`  💬 Exported ${comments.length} comments for page ${page.title || pageId}`);
+            }
+          } catch (error) {
+            this.log(
+              `  ⚠️  Failed to export comments for page ${pageId}: ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`
+            );
+          }
         }
 
-        // Export properties
-        const properties = await this.notionClient.getPageProperties(pageId);
-        if (properties.length > 0) {
-          await this.fileSystemManager.writeRawData(
-            properties,
-            `${configuration.outputPath}/properties/${pageId}-properties.json`
-          );
+        // Export properties if enabled
+        if (this.resolvedConfig["include-properties"]) {
+          try {
+            const properties = await this.notionClient.getPageProperties(pageId);
+            if (properties.length > 0) {
+              await this.fileSystemManager.writeRawData(
+                properties,
+                path.join(this.resolvedConfig.path, "properties", `${pageId}-properties.json`)
+              );
+              this.log(`  🏷️  Exported ${properties.length} properties for page ${page.title || pageId}`);
+            }
+          } catch (error) {
+            this.log(
+              `  ⚠️  Failed to export properties for page ${pageId}: ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`
+            );
+          }
         }
 
-        // Export block children
-        const blocks = await this.notionClient.getBlocks(pageId);
-        if (blocks.length > 0) {
-          await this.fileSystemManager.writeRawData(blocks, `${configuration.outputPath}/blocks/${pageId}-blocks.json`);
+        // Export block children if enabled
+        if (this.resolvedConfig["include-blocks"]) {
+          try {
+            const blocks = await this.exportAllBlocks(pageId);
+            if (blocks.length > 0) {
+              await this.fileSystemManager.writeRawData(
+                blocks,
+                path.join(this.resolvedConfig.path, "blocks", `${pageId}-blocks.json`)
+              );
+              this.log(`  📝 Exported ${blocks.length} blocks for page ${page.title || pageId}`);
+            }
+          } catch (error) {
+            this.log(
+              `  ⚠️  Failed to export blocks for page ${pageId}: ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`
+            );
+          }
         }
 
         await this.progressService.updateSectionProgress(exportId, "pages", 1);
@@ -517,11 +514,205 @@ export default class Export extends BaseCommand<typeof Export> {
   }
 
   /**
+   * Export all blocks for a page, including nested blocks.
+   */
+  private async exportAllBlocks(blockId: string): Promise<any[]> {
+    if (!this.notionClient) return [];
+
+    const allBlocks: any[] = [];
+    let hasMore = true;
+    let nextCursor: string | undefined = undefined;
+
+    while (hasMore) {
+      try {
+        const blocksResult = await this.notionClient.getBlocks(blockId);
+
+        for (const block of blocksResult.results) {
+          allBlocks.push(block);
+
+          // Recursively export child blocks if they exist
+          if (block.hasChildren) {
+            const childBlocks = await this.exportAllBlocks(block.id);
+            allBlocks.push(...childBlocks);
+          }
+        }
+
+        hasMore = blocksResult.hasMore;
+        nextCursor = blocksResult.nextCursor;
+      } catch (error) {
+        this.log(
+          `  ⚠️  Failed to get blocks for ${blockId}: ${error instanceof Error ? error.message : "Unknown error"}`
+        );
+        break;
+      }
+    }
+
+    return allBlocks;
+  }
+
+  /**
+   * Process databases for export with enhanced data collection.
+   */
+  private async processDatabases(exportId: string, databaseIds: string[]): Promise<void> {
+    if (!this.notionClient || !this.progressService) return;
+
+    await this.progressService.startSection(exportId, "databases", databaseIds.length);
+
+    for (const databaseId of databaseIds) {
+      try {
+        // 1. First export the database metadata
+        const database = await this.notionClient.getDatabase(databaseId);
+        await this.writeToOutput(database, "database");
+
+        // 2. Export database properties if enabled
+        if (this.resolvedConfig["include-properties"]) {
+          try {
+            const properties = await this.notionClient.getDatabaseProperties(databaseId);
+            if (properties.length > 0) {
+              await this.fileSystemManager.writeRawData(
+                properties,
+                path.join(this.resolvedConfig.path, "properties", `${databaseId}-properties.json`)
+              );
+              this.log(`  🏷️  Exported ${properties.length} properties for database ${database.title || databaseId}`);
+            }
+          } catch (error) {
+            this.log(
+              `  ⚠️  Failed to export properties for database ${databaseId}: ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`
+            );
+          }
+        }
+
+        // 3. Then export all pages in the database
+        let hasMore = true;
+        let nextCursor: string | undefined = undefined;
+        let pageCount = 0;
+        const databasePageIds: string[] = [];
+
+        while (hasMore) {
+          try {
+            const queryResult = await this.notionClient.queryDatabase(databaseId, {
+              start_cursor: nextCursor,
+              page_size: 100 // Process in batches of 100
+            });
+
+            // Export each page
+            for (const page of queryResult.results) {
+              await this.writeToOutput(page, "page");
+              databasePageIds.push(page.id);
+              pageCount++;
+            }
+
+            hasMore = queryResult.hasMore;
+            nextCursor = queryResult.nextCursor;
+
+            // Update progress with page count
+            if (queryResult.results.length > 0) {
+              this.log(
+                `📄 Exported ${queryResult.results.length} pages from database: ${database.title || databaseId}`
+              );
+            }
+          } catch (pageError) {
+            this.log(
+              `⚠️ Failed to query pages from database ${databaseId}: ${
+                pageError instanceof Error ? pageError.message : "Unknown error"
+              }`
+            );
+            break;
+          }
+        }
+
+        // 4. Export additional data for all pages in the database
+        if (databasePageIds.length > 0) {
+          this.log(
+            `📊 Processing additional data for ${databasePageIds.length} pages in database ${
+              database.title || databaseId
+            }`
+          );
+
+          // Process pages to get their comments, properties, and blocks
+          for (const pageId of databasePageIds) {
+            await this.exportPageAdditionalData(pageId);
+          }
+        }
+
+        this.log(`✅ Database ${database.title || databaseId}: exported metadata + ${pageCount} pages`);
+        await this.progressService.updateSectionProgress(exportId, "databases", 1);
+      } catch (error) {
+        const errorInfo = {
+          id: crypto.randomUUID(),
+          message: error instanceof Error ? error.message : "Unknown error",
+          code: "DATABASE_FETCH_ERROR",
+          timestamp: new Date(),
+          context: { databaseId }
+        };
+
+        await this.progressService.addError(exportId, "databases", errorInfo);
+      }
+    }
+
+    await this.progressService.completeSection(exportId, "databases");
+  }
+
+  /**
+   * Export additional data for a page (comments, properties, blocks).
+   */
+  private async exportPageAdditionalData(pageId: string): Promise<void> {
+    if (!this.notionClient) return;
+
+    // Export comments if enabled
+    if (this.resolvedConfig["include-comments"]) {
+      try {
+        const comments = await this.notionClient.getComments(pageId);
+        if (comments.length > 0) {
+          await this.fileSystemManager.writeRawData(
+            comments,
+            path.join(this.resolvedConfig.path, "comments", `${pageId}-comments.json`)
+          );
+        }
+      } catch (error) {
+        // Silently continue - already logged in main method
+      }
+    }
+
+    // Export properties if enabled
+    if (this.resolvedConfig["include-properties"]) {
+      try {
+        const properties = await this.notionClient.getPageProperties(pageId);
+        if (properties.length > 0) {
+          await this.fileSystemManager.writeRawData(
+            properties,
+            path.join(this.resolvedConfig.path, "properties", `${pageId}-properties.json`)
+          );
+        }
+      } catch (error) {
+        // Silently continue - already logged in main method
+      }
+    }
+
+    // Export blocks if enabled
+    if (this.resolvedConfig["include-blocks"]) {
+      try {
+        const blocks = await this.exportAllBlocks(pageId);
+        if (blocks.length > 0) {
+          await this.fileSystemManager.writeRawData(
+            blocks,
+            path.join(this.resolvedConfig.path, "blocks", `${pageId}-blocks.json`)
+          );
+        }
+      } catch (error) {
+        // Silently continue - already logged in main method
+      }
+    }
+  }
+
+  /**
    * Write data to output file using the new file system manager.
    */
   private async writeToOutput(data: any, type: string): Promise<void> {
     if (!this.fileSystemManager) {
-      throw new Error("File system manager not initialized");
+      throw new Error("file system manager not initialized");
     }
 
     try {
@@ -538,12 +729,12 @@ export default class Export extends BaseCommand<typeof Export> {
           break;
 
         default:
-          throw new Error(`Unknown data type: ${type}`);
+          throw new Error(`unknown data type: ${type}`);
       }
 
-      this.log(`📄 Exported ${type}: ${data.id} → ${filePath}`);
+      log.success(`📄 Exported ${type}: ${data.id} → ${filePath}`);
     } catch (error) {
-      this.log(`❌ Failed to write ${type} ${data.id}: ${error instanceof Error ? error.message : "Unknown error"}`);
+      log.error(`Failed to write ${type} ${data.id}: ${error instanceof Error ? error.message : "unknown error"}`);
       throw error;
     }
   }

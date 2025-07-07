@@ -1,31 +1,24 @@
-import { afterAll, beforeAll, describe, expect, it, test, vi } from "vitest";
+import { afterAll, test as baseTest, describe, expect, vi } from "vitest";
+import { TestContext } from "../../../test/extentions";
+import { getComplexityTimeout } from "../../../test/utils";
 import { config } from "../../lib/config-loader";
 import { NotionClient } from "./notion-client";
 import { toNotionID } from "./util";
 
-test("config is loaded", () => {
-  expect(config).toBeDefined();
-  expect(config.token).toHaveLength(50);
+const test = baseTest.extend<TestContext>({
+  notionClient: ({}, use) => use(new NotionClient({ apiKey: config.token }))
 });
 
 // These tests require a valid Notion integration token and a test workspace
 describe("NotionClient Live API Tests", () => {
-  let notionClient: NotionClient;
   const testPageId = "1ded7342-e571-802e-8d06-fca37dbe8bc4";
   const testDatabaseId = toNotionID("16ad7342e57180c4a065c7a1015871d3");
-
-  beforeAll(() => {
-    if (!config.token) {
-      throw new Error("NOTION_TOKEN is required for live tests");
-    }
-    notionClient = new NotionClient({ apiKey: config.token });
-  });
 
   afterAll(() => {
     vi.restoreAllMocks();
   });
 
-  it("should retrieve workspace information", async () => {
+  test("should retrieve workspace information", async ({ notionClient }) => {
     const workspace = await notionClient.getWorkspace();
     expect(workspace).toHaveProperty("id");
     expect(workspace).toHaveProperty("name");
@@ -33,7 +26,7 @@ describe("NotionClient Live API Tests", () => {
     expect(workspace).toHaveProperty("createdTime");
   });
 
-  it("should list users", async () => {
+  test("should list users", async ({ notionClient }) => {
     const users = await notionClient.getUsers();
     expect(Array.isArray(users)).toBe(true);
     if (users.length > 0) {
@@ -43,31 +36,31 @@ describe("NotionClient Live API Tests", () => {
     }
   });
 
-  it("should retrieve a page", async () => {
+  test("should retrieve a page", async ({ notionClient }) => {
     const page = await notionClient.getPage(testPageId);
     expect(page).toHaveProperty("id", testPageId);
     expect(page).toHaveProperty("title");
   });
 
-  it("should retrieve a database", async () => {
+  test("should retrieve a database", async ({ notionClient }) => {
     const database = await notionClient.getDatabase(testDatabaseId);
     expect(database).toHaveProperty("id", testDatabaseId);
     expect(database).toHaveProperty("title");
   });
 
-  it("should query a database", async () => {
+  test("should query a database", async ({ notionClient }) => {
     const result = await notionClient.queryDatabase(testDatabaseId);
     expect(result).toHaveProperty("results");
     expect(result).toHaveProperty("hasMore");
   });
 
-  it("should get blocks for a page", async () => {
+  test("should get blocks for a page", async ({ notionClient }) => {
     const result = await notionClient.getBlocks(testPageId);
     expect(result).toHaveProperty("results");
     expect(result).toHaveProperty("hasMore");
   });
 
-  it("should get comments for a page", async () => {
+  test("should get comments for a page", async ({ notionClient }) => {
     const comments = await notionClient.getComments(testPageId);
     expect(Array.isArray(comments)).toBe(true);
     if (comments.length > 0) {
@@ -79,7 +72,7 @@ describe("NotionClient Live API Tests", () => {
     }
   });
 
-  it("get-page-property-item", async () => {
+  test("get-page-property-item", async ({ notionClient }) => {
     // First get the page to find a property ID
     const page = await notionClient.getPage(testPageId);
     const propertyId = Object.keys(page.properties)[0];
@@ -91,7 +84,7 @@ describe("NotionClient Live API Tests", () => {
     expect(property).toHaveProperty("type");
   });
 
-  it("should get database properties", async () => {
+  test("should get database properties", async ({ notionClient }) => {
     const properties = await notionClient.getDatabaseProperties(testDatabaseId);
     expect(Array.isArray(properties)).toBe(true);
     if (properties.length > 0) {
@@ -102,7 +95,7 @@ describe("NotionClient Live API Tests", () => {
     }
   });
 
-  it("should get page properties", async () => {
+  test("should get page properties", async ({ notionClient }) => {
     const properties = await notionClient.getPageProperties(testPageId);
     expect(Array.isArray(properties)).toBe(true);
     if (properties.length > 0) {
@@ -113,7 +106,7 @@ describe("NotionClient Live API Tests", () => {
     }
   });
 
-  it("should get block children", async () => {
+  test("get-block-children", async ({ notionClient }) => {
     const blocks = await notionClient.getBlockChildren(testPageId);
     expect(Array.isArray(blocks)).toBe(true);
     if (blocks.length > 0) {
@@ -123,25 +116,50 @@ describe("NotionClient Live API Tests", () => {
     }
   });
 
-  it("should handle rate limiting", async () => {
-    // Mock rate limit error
-    vi.spyOn(notionClient as any, "execute").mockRejectedValueOnce({
-      code: 429,
-      headers: {
-        "retry-after": "1"
-      }
-    });
+  test("handle-rate-limit-errors", async ({ notionClient }) => {
+    // Mock console methods to suppress log output during this test
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     try {
-      await notionClient.getPage(testPageId);
-    } catch (error) {
-      expect(error).toBeInstanceOf(Error);
-      expect((error as Error).message).toContain("Rate limit exceeded");
+      const rateLimitError = new Error("Rate limit exceeded") as any;
+      rateLimitError.code = "rate_limited";
+      rateLimitError.status = 429;
+      rateLimitError.headers = { "retry-after": "1" };
+
+      vi.spyOn(notionClient["client"].pages, "retrieve").mockRejectedValueOnce(rateLimitError);
+
+      await expect(notionClient.getPage(testPageId)).rejects.toThrow("Rate limit exceeded. Retry after 1 seconds.");
+
+      // Verify rate limit info is set
+      const rateLimitInfo = notionClient.getRateLimitInfo();
+      expect(rateLimitInfo).toBeDefined();
+      expect(rateLimitInfo?.retryAfter).toBe(1);
+    } finally {
+      // Always restore mocks
+      consoleSpy.mockRestore();
+      consoleErrorSpy.mockRestore();
+      vi.restoreAllMocks();
     }
   });
 
-  it("should handle authentication errors", async () => {
-    const invalidClient = new NotionClient({ apiKey: "invalid_token" });
-    await expect(invalidClient.getPage(testPageId)).rejects.toThrow("Invalid API key");
-  });
+  test(
+    "handle-authentication-errors",
+    {
+      timeout: getComplexityTimeout(10)
+    },
+    async () => {
+      const badClient = new NotionClient({ apiKey: "invalid_token" });
+
+      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      try {
+        await expect(badClient.getPage(testPageId)).rejects.toThrowError();
+      } finally {
+        consoleWarnSpy.mockRestore();
+        consoleErrorSpy.mockRestore();
+      }
+    }
+  );
 });

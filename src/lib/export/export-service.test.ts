@@ -1,12 +1,30 @@
-/**
- * Export Service Tests
- */
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Export } from "../../core/domain/export";
+import { ExportAlreadyRunningError, ExportError, ExportNotFoundError } from "../../shared/errors";
+import { ExportConfiguration, ExportStatus } from "../../shared/types";
+import { ExportService } from "./export-service";
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { ExportService } from "../export-service";
-import { Export, ExportFactory } from "../../domain/export";
-import { ExportConfiguration, ExportStatus } from "../../../shared/types";
-import { ExportError, ExportNotFoundError, ExportAlreadyRunningError } from "../../../shared/errors";
+// Mock fs module
+vi.mock("fs", () => ({
+  promises: {
+    mkdir: vi.fn().mockResolvedValue(undefined),
+    writeFile: vi.fn().mockResolvedValue(undefined)
+  }
+}));
+
+// Mock workspace-metadata-exporter
+vi.mock("./workspace-metadata-exporter", () => ({
+  WorkspaceMetadataExporter: vi.fn().mockImplementation(() => ({
+    export: vi.fn().mockResolvedValue({
+      exportDate: "2024-01-01T00:00:00Z",
+      exportVersion: "1.0.0",
+      user: { id: "user-123", name: "Test User" }
+    })
+  }))
+}));
+
+// Mock Notion client
+vi.mock("@notionhq/client");
 
 // Define ExportFormat enum for tests
 enum ExportFormat {
@@ -295,6 +313,123 @@ describe("ExportService", () => {
       const runningExports = await exportService.getRunningExports();
       expect(runningExports).toHaveLength(1);
       expect(runningExports[0].id).toBe(export1.id);
+    });
+  });
+
+  describe("executeExport", () => {
+    let mockProgressService: any;
+    let exportServiceWithProgress: ExportService;
+
+    beforeEach(() => {
+      // Create mock ProgressService
+      mockProgressService = {
+        startTracking: vi.fn().mockResolvedValue(undefined),
+        stopTracking: vi.fn().mockResolvedValue(undefined),
+        updateProgress: vi.fn().mockResolvedValue(undefined),
+        getProgress: vi.fn().mockReturnValue({ processed: 0, total: 0 })
+      };
+
+      // Create ExportService with ProgressService
+      exportServiceWithProgress = new ExportService(mockRepository, mockEventPublisher, mockProgressService);
+    });
+
+    it("should throw error when export is not running", async () => {
+      const configuration = createTestConfiguration();
+      const export_ = await exportServiceWithProgress.createExport(configuration);
+
+      const exporterConfig = {
+        token: "test-token",
+        output: "/test/output",
+        timeout: 30000
+      } as any;
+
+      await expect(exportServiceWithProgress.executeExport(export_.id, exporterConfig)).rejects.toThrow(
+        "Cannot execute export in pending status"
+      );
+    });
+
+    it("should throw error when ProgressService is not provided", async () => {
+      const configuration = createTestConfiguration();
+      const export_ = await exportService.createExport(configuration);
+      await exportService.startExport(export_.id);
+
+      const exporterConfig = {
+        token: "test-token",
+        output: "/test/output",
+        timeout: 30000
+      } as any;
+
+      await expect(exportService.executeExport(export_.id, exporterConfig)).rejects.toThrow(
+        "ProgressService is required for export execution"
+      );
+    });
+
+    it("should execute export successfully", async () => {
+      const configuration = createTestConfiguration();
+      const export_ = await exportServiceWithProgress.createExport(configuration);
+      await exportServiceWithProgress.startExport(export_.id);
+
+      const exporterConfig = {
+        token: "test-token",
+        output: "/test/output",
+        timeout: 30000,
+        archived: false,
+        comments: false,
+        properties: true,
+        size: 10
+      } as any;
+
+      const result = await exportServiceWithProgress.executeExport(export_.id, exporterConfig);
+
+      // Verify result structure
+      expect(result).toHaveProperty("usersCount");
+      expect(result).toHaveProperty("databasesCount");
+      expect(result).toHaveProperty("pagesCount");
+      expect(result).toHaveProperty("blocksCount");
+      expect(result).toHaveProperty("commentsCount");
+      expect(result).toHaveProperty("filesCount");
+      expect(result).toHaveProperty("startTime");
+      expect(result).toHaveProperty("endTime");
+      expect(result).toHaveProperty("errors");
+      expect(result).toHaveProperty("workspaceInfo");
+
+      // Verify counts match configuration
+      expect(result.databasesCount).toBe(2); // From configuration
+      expect(result.pagesCount).toBe(1); // From configuration
+      expect(result.errors).toHaveLength(0);
+
+      expect(mockProgressService.startTracking).toHaveBeenCalledWith(export_.id);
+
+      // Verify export was completed
+      const completedExport = await exportServiceWithProgress.getExport(export_.id);
+      expect(completedExport.status).toBe(ExportStatus.COMPLETED);
+      expect(completedExport.outputPath).toBe("/test/output");
+    });
+
+    it("should update progress with export result statistics", async () => {
+      const configuration = createTestConfiguration();
+      const export_ = await exportServiceWithProgress.createExport(configuration);
+      await exportServiceWithProgress.startExport(export_.id);
+
+      const exporterConfig = {
+        token: "test-token",
+        output: "/test/output",
+        timeout: 30000,
+        archived: false,
+        comments: false,
+        properties: true,
+        size: 10
+      } as any;
+
+      // Execute export
+      await exportServiceWithProgress.executeExport(export_.id, exporterConfig);
+
+      // Verify progress was updated
+      const completedExport = await exportServiceWithProgress.getExport(export_.id);
+      expect(completedExport.progress.processed).toBeGreaterThan(0);
+      expect(completedExport.progress.total).toBeGreaterThan(0);
+      expect(completedExport.progress.percentage).toBe(100);
+      expect(completedExport.progress.currentOperation).toBe("completed");
     });
   });
 });

@@ -1,10 +1,12 @@
 import { Flags } from "@oclif/core";
-import { Flag } from "@oclif/core/interfaces";
+import { Flag } from "@oclif/core/lib/interfaces";
+import * as fs from "fs/promises";
 import path from "path";
+import * as yaml from "yaml";
 import { dotEnvAdapter } from "zod-config/dotenv-adapter";
 import { yamlAdapter } from "zod-config/yaml-adapter";
 import * as z4 from "zod/v4";
-import { log } from "./log";
+import { log } from "../log";
 
 /**
  * Configuration options for command-line flags and configuration parsing.
@@ -25,6 +27,8 @@ export type ConfigOptions = {
 };
 
 export type Config = z4.infer<ReturnType<typeof createConfigSchema>>;
+
+export type ConfigType = CommandFlagKeys<"export">;
 
 export const parseables: { [key: string]: ConfigOptions } = {
   /**
@@ -203,12 +207,28 @@ export const parseables: { [key: string]: ConfigOptions } = {
   }
 };
 
+export type ExportConfig = ResolvedCommandConfig<"export">;
+export const exportConfigSchema = createCommandConfigSchema("export");
+
+export type ExportPropertyTypes = {
+  [K in keyof ExportConfig]: ExportConfig[K];
+};
+
+const a: ExportConfig = {
+  // format: "string",
+  // "max-concurrency": "number",
+  // "include-blocks": "boolean",
+  // "include-comments": "boolean",
+  // "include-properties": "boolean"
+};
+
 // ================================================================
 // Command-Specific Flag Extraction Types and Functions
 // ================================================================
 
 /**
  * Extract flag names that are available for a specific command.
+ * This creates a proper mapped type instead of a string union.
  */
 type ExtractFlagKeysForCommand<TCommand extends string> = {
   [K in keyof typeof parseables]: (typeof parseables)[K]["commands"] extends readonly string[]
@@ -218,19 +238,37 @@ type ExtractFlagKeysForCommand<TCommand extends string> = {
       ? K
       : never
     : never;
-}[keyof typeof parseables];
+};
 
 /**
  * Type for command-specific flags object.
+ * This creates a proper mapped type using the extracted keys.
  */
 export type CommandFlags<TCommand extends string> = {
-  [K in ExtractFlagKeysForCommand<TCommand>]: (typeof parseables)[K]["flag"];
+  [K in keyof ExtractFlagKeysForCommand<TCommand> as ExtractFlagKeysForCommand<TCommand>[K] extends never
+    ? never
+    : K]: (typeof parseables)[K]["flag"];
 };
 
 /**
  * Type for inferring the keys that will be available for a command.
+ * This extracts only the non-never keys from the mapped type.
  */
-export type CommandFlagKeys<TCommand extends string> = ExtractFlagKeysForCommand<TCommand>;
+export type CommandFlagKeys<TCommand extends string> = keyof {
+  [K in keyof ExtractFlagKeysForCommand<TCommand> as ExtractFlagKeysForCommand<TCommand>[K] extends never
+    ? never
+    : K]: true;
+};
+
+/**
+ * Type for the resolved configuration that combines all available flags for a command.
+ * This creates a proper object type with all the flag values.
+ */
+export type ResolvedCommandConfig<TCommand extends string> = {
+  [K in CommandFlagKeys<TCommand>]: K extends keyof typeof parseables
+    ? z4.infer<ReturnType<(typeof parseables)[K]["schema"]>>
+    : never;
+};
 
 /**
  * Extracts flags available for a specific command.
@@ -238,7 +276,7 @@ export type CommandFlagKeys<TCommand extends string> = ExtractFlagKeysForCommand
  * @param commandName - The name of the command to extract flags for
  * @returns Object containing only the flags available for the specified command
  */
-export function extractFlagsForCommand<TCommand extends string>(commandName: TCommand): CommandFlags<TCommand> {
+export function createCommandFlags<TCommand extends string>(commandName: TCommand): CommandFlags<TCommand> {
   const commandFlags: Record<string, Flag<any>> = {};
 
   for (const [flagKey, flagConfig] of Object.entries(parseables)) {
@@ -254,40 +292,57 @@ export function extractFlagsForCommand<TCommand extends string>(commandName: TCo
 }
 
 /**
- * Gets all available flag keys for a command (includes global flags).
+ * Creates a command-specific configuration schema.
  *
- * @param commandName - The name of the command
- * @returns Array of flag keys available for the command
+ * @param commandName - The name of the command to create the schema for
+ * @returns A Zod schema that includes only the flags available for the specified command
  */
-export function getCommandFlagKeys<TCommand extends string>(commandName: TCommand): CommandFlagKeys<TCommand>[] {
-  const flagKeys: string[] = [];
+export function createCommandConfigSchema<TCommand extends string>(commandName: TCommand) {
+  const schema: Record<string, z4.ZodType<any>> = {};
 
   for (const [flagKey, flagConfig] of Object.entries(parseables)) {
     const isGlobalFlag = flagConfig.commands.includes("*");
     const isCommandFlag = flagConfig.commands.includes(commandName);
 
     if (isGlobalFlag || isCommandFlag) {
-      flagKeys.push(flagKey);
+      if (flagConfig.debug) {
+        schema[flagKey] = z4.preprocess((value) => {
+          log.debug("Config inspection", { name: flagKey, value });
+          return value;
+        }, flagConfig.schema().optional());
+      } else {
+        schema[flagKey] = flagConfig.schema().optional();
+      }
     }
   }
 
-  return flagKeys as CommandFlagKeys<TCommand>[];
+  return z4.object(schema);
 }
 
 /**
- * Helper function to create typed flags for a command.
- * This is the main function commands should use.
+ * Compiles configuration for a specific command, combining config file, environment variables, and CLI flags.
  *
  * @param commandName - The name of the command
- * @returns Typed flags object for the command
+ * @param flags - CLI flags provided by the user
+ * @returns Compiled configuration object with proper typing
  */
-export function createCommandFlags<TCommand extends string>(commandName: TCommand) {
-  return extractFlagsForCommand(commandName);
-}
+export function compileCommandConfig<TCommand extends string>(
+  commandName: TCommand,
+  flags: Record<string, any>
+): ResolvedCommandConfig<TCommand> {
+  const commandSchema = createCommandConfigSchema(commandName);
 
-// ================================================================
-// Schema and Config Functions (Existing)
-// ================================================================
+  // Merge config sources with proper precedence
+  const mergedConfig = {
+    ...config,
+    ...flags
+  };
+
+  // Validate and parse the configuration
+  const validatedConfig = commandSchema.parse(mergedConfig);
+
+  return validatedConfig as ResolvedCommandConfig<TCommand>;
+}
 
 /**
  * Creates a complete schema object based on the parseables configuration.
@@ -384,3 +439,190 @@ export const compileConfig = (flags: Record<string, any>) => {
     ...flags
   };
 };
+
+/**
+ * Generates example values based on the Zod schema type.
+ *
+ * This function intelligently creates realistic example values based on the schema type
+ * and the flag name. It handles various Zod types including boolean, number, string,
+ * enum, and array types.
+ *
+ * @param schema - The Zod schema to generate an example for.
+ * @param flagConfig - The flag configuration containing metadata about the flag.
+ * @returns An example value appropriate for the schema type and flag purpose.
+ *
+ * @example
+ * // For a boolean flag named "verbose"
+ * generateExampleValue(z.boolean(), { name: "verbose", ... }) // returns true
+ *
+ * // For a string flag named "token"
+ * generateExampleValue(z.string(), { name: "token", ... }) // returns "ntn_abc123..."
+ */
+function generateExampleValue(schema: z4.ZodType<any>, flagConfig: ConfigOptions): any {
+  // Get the inner type if it's optional
+  const innerSchema = schema instanceof z4.ZodOptional ? schema._def.innerType : schema;
+
+  if (innerSchema instanceof z4.ZodBoolean) {
+    // Return true for features that are typically enabled
+    return flagConfig.name.includes("include") || flagConfig.name === "verbose" ? true : false;
+  }
+
+  if (innerSchema instanceof z4.ZodNumber) {
+    // Generate meaningful numbers based on the flag name
+    if (flagConfig.name.includes("concurrency")) {
+      return 5; // Reasonable concurrency for most use cases
+    }
+    if (flagConfig.name === "timeout") {
+      return 300; // 5 minutes in seconds
+    }
+    if (flagConfig.name === "retries") {
+      return 3; // Standard retry count
+    }
+    return 10; // Default for other numbers
+  }
+
+  if (innerSchema instanceof z4.ZodString) {
+    // Generate meaningful strings based on the flag name
+    if (flagConfig.name === "token") {
+      // Generate a valid-looking Notion token
+      const randomChars = Array.from({ length: 46 }, () => Math.random().toString(36).charAt(2)).join("");
+      return `ntn_${randomChars}`;
+    }
+    if (flagConfig.name === "path" || flagConfig.name === "output") {
+      return "./exports/notion-workspace";
+    }
+    if (flagConfig.name === "pages") {
+      return "550e8400-e29b-41d4-a716-446655440000,6ba7b810-9dad-11d1-80b4-00c04fd430c8";
+    }
+    return "example-value";
+  }
+
+  if (innerSchema instanceof z4.ZodEnum) {
+    // Return a meaningful enum value based on the flag name
+    if (flagConfig.name === "format") {
+      return "markdown"; // Popular export format
+    }
+    // For other enums, return a default based on the schema definition
+    try {
+      // Try to parse a sample value to get the allowed values
+      const allowedValues = (innerSchema as any).options || [];
+      return allowedValues[0] || "default";
+    } catch {
+      return "default";
+    }
+  }
+
+  if (innerSchema instanceof z4.ZodArray) {
+    // Generate array examples
+    if (flagConfig.name === "databases") {
+      return [
+        { name: "Project Tasks", id: "110e8400-e29b-41d4-a716-446655440001" },
+        { name: "Team Members", id: "220e8400-e29b-41d4-a716-446655440002" },
+        { name: "Documentation", id: "330e8400-e29b-41d4-a716-446655440003" }
+      ];
+    }
+    return [];
+  }
+
+  // Fallback for unknown types.
+  return null;
+}
+
+/**
+ * Generates a comprehensive YAML configuration file with example values based on the parseables schema.
+ *
+ * This function creates a well-structured configuration file that includes:
+ * - All available configuration options organized by command
+ * - Intelligent example values based on the option type and purpose
+ * - Helpful comments describing each option (when includeComments is true)
+ * - Clear separation between global and command-specific settings
+ *
+ * @param outputPath - The path where the YAML file should be written. Defaults to "./notion-sync.yaml".
+ * @param includeComments - Whether to include helpful comments in the YAML. Defaults to true.
+ * @returns A promise that resolves when the file is successfully written.
+ *
+ * @throws Will throw an error if the file cannot be written due to permissions or other I/O issues.
+ *
+ */
+export async function generateConfigYaml(
+  outputPath: string = "./notion-sync.yaml",
+  includeComments: boolean = true
+): Promise<void> {
+  const configExample: Record<string, any> = {};
+  const doc = new yaml.Document();
+
+  // Group flags by command for better organization
+  const globalFlags: Record<string, any> = {};
+  const commandFlags: Record<string, Record<string, any>> = {};
+
+  for (const [key, flagConfig] of Object.entries(parseables)) {
+    const schema = flagConfig.schema();
+    const exampleValue = generateExampleValue(schema, flagConfig);
+
+    if (flagConfig.commands.includes("*")) {
+      // Global flag
+      globalFlags[key] = exampleValue;
+    } else {
+      // Command-specific flag
+      for (const command of flagConfig.commands) {
+        if (!commandFlags[command]) {
+          commandFlags[command] = {};
+        }
+        commandFlags[command][key] = exampleValue;
+      }
+    }
+  }
+
+  // Build the YAML structure with comments
+  const yamlContent: any = {
+    "# Notion Sync Configuration": null,
+    "# This file contains configuration options for the Notion Sync CLI": null,
+    "# Environment variables and command-line flags will override these values": null,
+    "#EMPTY_LINE_1": null,
+
+    "# Global Settings": null,
+    "# These settings apply to all commands": null,
+    ...globalFlags,
+    "#EMPTY_LINE_2": null
+  };
+
+  // Add command-specific sections
+  for (const [command, flags] of Object.entries(commandFlags)) {
+    yamlContent[`# ${command.charAt(0).toUpperCase() + command.slice(1)} Command Settings`] = null;
+    yamlContent[`# Settings specific to the '${command}' command`] = null;
+
+    // Add flags with their descriptions as comments
+    for (const [flagKey, value] of Object.entries(flags)) {
+      const flagConfig = parseables[flagKey];
+      if (flagConfig && includeComments) {
+        yamlContent[`# ${flagConfig.flag.description || "No description available"}`] = null;
+      }
+      yamlContent[flagKey] = value;
+    }
+    yamlContent[`#EMPTY_LINE_${command}`] = null;
+  }
+
+  // Convert to YAML string with custom formatting
+  let yamlString = "";
+  let emptyLineCounter = 100; // Start counter for unique empty line keys
+
+  for (const [key, value] of Object.entries(yamlContent)) {
+    if (key.startsWith("#EMPTY_LINE")) {
+      // Empty line marker
+      yamlString += "\n";
+    } else if (key.startsWith("#")) {
+      // It's a comment
+      yamlString += `${key}\n`;
+    } else {
+      // Regular key-value pair
+      if (value !== null && value !== undefined) {
+        yamlString += yaml.stringify({ [key]: value });
+      }
+    }
+  }
+
+  // Write the file
+  await fs.writeFile(outputPath, yamlString, "utf-8");
+
+  log.info(`Configuration file generated at: ${outputPath}`);
+}

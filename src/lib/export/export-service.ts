@@ -1,23 +1,29 @@
 /**
  * Export Service
  *
- * Core business logic for managing exports
+ * Core business logic for managing exports. This service orchestrates
+ * the export lifecycle, managing state transitions and coordinating
+ * with the WorkspaceExporter for actual export execution.
  */
 
+import { log } from "$lib/log";
+import { Export, ExportFactory, ExportRepository } from "../../core/domain/export";
+import { ExportEvents } from "../../core/events/index";
+import { ProgressService } from "../../core/services/progress-service";
 import { ExportAlreadyRunningError, ExportError, ExportNotFoundError } from "../../shared/errors/index";
 import { ExportConfiguration } from "../../shared/types/index";
-import { Export, ExportFactory, ExportRepository } from "../domain/export";
-import { ExportEvents } from "../events/index";
 
 export class ExportService {
-  constructor(private exportRepository: ExportRepository, private eventPublisher: (event: any) => Promise<void>) {}
+  constructor(
+    private exportRepository: ExportRepository,
+    private eventPublisher: (event: any) => Promise<void>,
+    private progressService?: ProgressService
+  ) {}
 
-  async createExport(configuration: ExportConfiguration): Promise<Export> {
-    // Validate configuration
-    this.validateConfiguration(configuration);
-
+  async create(configuration: ExportConfiguration): Promise<Export> {
     // Check for existing running exports with same configuration
     const runningExports = await this.exportRepository.findRunning();
+    log.debugging.inspect("Running exports", runningExports);
     const conflictingExport = runningExports.find((exp) =>
       this.configurationsConflict(exp.configuration, configuration)
     );
@@ -140,19 +146,6 @@ export class ExportService {
     await this.eventPublisher(ExportEvents.started(newExport.id, newExport.configuration));
 
     return newExport;
-  }
-
-  private validateConfiguration(configuration: ExportConfiguration): void {
-    if (!configuration.outputPath) {
-      throw new ExportError("Output path is required");
-    }
-
-    if (configuration.databases.length === 0 && configuration.pages.length === 0) {
-      throw new ExportError("At least one database or page must be specified");
-    }
-
-    // Validate paths exist and are accessible
-    // This would typically involve filesystem checks
   }
 
   private configurationsConflict(config1: ExportConfiguration, config2: ExportConfiguration): boolean {

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FileSystemManager } from "../../../infrastructure/filesystem/file-system-manager";
 import { NotionClient } from "../../../infrastructure/notion/notion-client";
-import { Export } from "../export";
+import { Export } from "./commands/export";
 
 // Mock dependencies
 vi.mock("../../../infrastructure/filesystem/file-system-manager");

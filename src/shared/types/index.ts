@@ -4,7 +4,7 @@
  * Core types used throughout the application
  */
 
-import { config } from "$lib/config-loader";
+import { config } from "$lib/config/config-loader";
 
 // Base types
 export interface Entity {
