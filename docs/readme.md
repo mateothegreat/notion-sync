@@ -4,6 +4,8 @@ Notion Sync is a tool for importing and exporting content to and from Notion.
 
 ![](2025-07-01-11-59-05.png)
 
+> 🏗️ Curious about the architecture? Check out [docs/architecture.md](docs/architecture.md).
+
 ## Key Features
 
 - 💯 Handles nested pages and blocks like a boss.
