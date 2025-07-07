@@ -1,7 +1,7 @@
 /* <reference types="node" /> */
 /* node types */
 import { Flags } from "@oclif/core";
-import { Flag } from "@oclif/core/lib/interfaces";
+import { Interfaces } from "@oclif/core";
 import * as z from "zod";
 import * as fs from "fs/promises";
 import path from "path";
@@ -27,7 +27,7 @@ export const coreFlags = {
     description: "Enable verbose logging.",
     default: false
   })
-} as const satisfies Record<string, Flag<any>>;
+} as const satisfies Record<string, Interfaces.Flag<any>>;
 
 export const coreSchema = z.object({
   token: z.string().min(1, "A Notion API token is required"),
@@ -76,7 +76,7 @@ export const exportFlags = {
     description: "Include all properties in export.",
     default: true
   })
-} as const satisfies Record<string, Flag<any>>;
+} as const satisfies Record<string, Interfaces.Flag<any>>;
 
 export const exportSchema = coreSchema.merge(
   z.object({
@@ -102,7 +102,7 @@ export type ExportConfig = z.infer<typeof exportSchema>;
 type CommandName = "export" | "*";
 
 interface CommandDefinition<TSchema extends z.ZodTypeAny> {
-  flags: Record<string, Flag<any>>;
+  flags: Record<string, Interfaces.Flag<any>>;
   schema: TSchema;
 }
 
@@ -118,7 +118,7 @@ const commandRegistry: Record<CommandName, CommandDefinition<any>> = {
 /**
  * Returns the combined set of CLI flags (core + command specific) for the given command.
  */
-export function createCommandFlags<T extends CommandName>(commandName: T): Record<string, Flag<any>> {
+export function createCommandFlags<T extends CommandName>(commandName: T): Record<string, Interfaces.Flag<any>> {
   return commandRegistry[commandName]?.flags ?? coreFlags;
 }
 
