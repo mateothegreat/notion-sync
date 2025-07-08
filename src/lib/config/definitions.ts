@@ -1,4 +1,4 @@
-import { ExportFormat } from "$lib/exporters/exporter";
+import { Exporter } from "$lib/exporters/exporter";
 import util from "$lib/util";
 import { Flags } from "@oclif/core";
 import { Flag } from "@oclif/core/lib/interfaces";
@@ -110,7 +110,7 @@ export const definitions = createDefinitions({
     commands: ["export"],
     flag: Flags.string({
       description: "Naming strategy for exported files.",
-      default: util.normalization.NamingStrategy.TITLE
+      default: util.normalization.NamingStrategy.ID
     }),
     schema: () => z.nativeEnum(util.normalization.NamingStrategy)
   },
@@ -120,7 +120,7 @@ export const definitions = createDefinitions({
     commands: ["export"],
     flag: Flags.string({
       description: "Organization strategy for exported files.",
-      default: util.organization.OrganizationStrategy.FLAT
+      default: util.organization.OrganizationStrategy.TYPE
     }),
     schema: () => z.nativeEnum(util.organization.OrganizationStrategy)
   },
@@ -170,12 +170,12 @@ export const definitions = createDefinitions({
     name: "format",
     variants: ["FORMAT", "format"],
     commands: ["export"],
-    flag: Flags.custom<ExportFormat>({
+    flag: Flags.custom<Exporter>({
       char: "f",
       description: "Export format.",
-      options: Object.values(ExportFormat)
+      options: Object.values(Exporter)
     })(),
-    schema: () => z.nativeEnum(ExportFormat)
+    schema: () => z.nativeEnum(Exporter)
   },
   "max-concurrency": {
     name: "max-concurrency",
@@ -227,13 +227,17 @@ export const definitions = createDefinitions({
     }),
     schema: () => z.boolean()
   },
-  output: {
-    name: "output",
-    variants: ["OUTPUT", "output"],
+  exporters: {
+    name: "exporters",
+    variants: ["EXPORTERS", "exporters"],
     commands: ["export"],
-    flag: Flags.string({
-      description: "Output directory (alias for --path)."
-    }),
-    schema: () => z.string().optional()
+    flag: Flags.custom<Array<Exporter>>({
+      char: "e",
+      description: "Comma-separated list of exporters to use for export.",
+      parse: async (input) => {
+        return input.split(",").map((id) => id.trim());
+      }
+    })(),
+    schema: () => z.array(z.nativeEnum(Exporter))
   }
 });

@@ -7,7 +7,8 @@
 
 import { PropertyItemListResponse, PropertyItemObjectResponse } from "@notionhq/client/build/src/api-endpoints";
 import { beforeEach, describe, expect, it } from "vitest";
-import { NotionClient } from "./notion-client";
+import { NotionClient } from "./client";
+import { transformers } from "./transformers";
 
 describe("NotionClient - transformPropertyItem", () => {
   let notionClient: NotionClient;
@@ -43,7 +44,7 @@ describe("NotionClient - transformPropertyItem", () => {
         ]
       };
 
-      const result = notionClient.transformPropertyItem(listResponse);
+      const result = transformers.propertyItem(listResponse);
 
       expect(result.id).toBe("result-1");
       expect(result.object).toBe("list");
@@ -69,7 +70,7 @@ describe("NotionClient - transformPropertyItem", () => {
         results: []
       };
 
-      const result = notionClient.transformPropertyItem(listResponse);
+      const result = transformers.propertyItem(listResponse);
 
       expect(result.id).toBe("property-2");
       expect(result.object).toBe("list");
@@ -101,7 +102,7 @@ describe("NotionClient - transformPropertyItem", () => {
         object: "property_item"
       };
 
-      const result = notionClient.transformPropertyItem(objectResponse);
+      const result = transformers.propertyItem(objectResponse);
 
       expect(result.id).toBe("property-3");
       expect(result.type).toBe("rich_text");
@@ -118,7 +119,7 @@ describe("NotionClient - transformPropertyItem", () => {
         object: "property_item"
       };
 
-      const result = notionClient.transformPropertyItem(objectResponse);
+      const result = transformers.propertyItem(objectResponse);
 
       expect(result.id).toBe("property-4");
       expect(result.type).toBe("number");

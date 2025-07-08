@@ -4,7 +4,7 @@
  * Core types used throughout the application
  */
 
-import { ExportFormat as ExporterFormat } from "$lib/exporters/exporter";
+import { Exporter as ExporterFormat } from "$lib/exporters/exporter";
 
 export type ExportFormat = ExporterFormat;
 export { ExporterFormat as ExportFormatEnum };

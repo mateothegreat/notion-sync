@@ -4,7 +4,7 @@
  * Central manager for all file system operations with atomic transactions
  */
 
-import { ExportFormat } from "$lib/exporters/exporter";
+import { Exporter } from "$lib/exporters/exporter";
 import fs from "fs";
 import path from "path";
 import { promisify } from "util";
@@ -20,7 +20,7 @@ const writeFile = promisify(fs.writeFile);
 
 export class FileSystemManager {
   private config: FileSystemConfig;
-  private writers: Map<ExportFormat, FileWriter>;
+  private writers: Map<Exporter, FileWriter>;
   private organizer: WorkspaceOrganizer;
   private atomicOperations: AtomicFileOperation;
   private eventPublisher?: (event: any) => Promise<void>;
@@ -39,14 +39,14 @@ export class FileSystemManager {
    * Initialize file writers for all supported formats
    */
   private initializeWriters(): void {
-    this.writers.set(ExportFormat.JSON, new JSONWriter(this.config, this.eventPublisher));
-    this.writers.set(ExportFormat.MARKDOWN, new MarkdownWriter(this.config, this.eventPublisher));
+    this.writers.set(Exporter.JSON, new JSONWriter(this.config, this.eventPublisher));
+    this.writers.set(Exporter.MARKDOWN, new MarkdownWriter(this.config, this.eventPublisher));
   }
 
   /**
    * Write a database to file system
    */
-  async writeDatabase(database: NotionDatabase, format: ExportFormat, operationId?: string): Promise<string> {
+  async writeDatabase(database: NotionDatabase, format: Exporter, operationId?: string): Promise<string> {
     const writer = this.getWriter(format);
     const outputPath = this.organizer.getDatabasePath(database, this.config.baseOutputPath);
 
@@ -71,7 +71,7 @@ export class FileSystemManager {
   /**
    * Write a page to file system
    */
-  async writePage(page: NotionPage, format: ExportFormat, operationId?: string): Promise<string> {
+  async writePage(page: NotionPage, format: Exporter, operationId?: string): Promise<string> {
     const writer = this.getWriter(format);
     const outputPath = this.organizer.getPagePath(page, this.config.baseOutputPath);
 
@@ -98,7 +98,7 @@ export class FileSystemManager {
    */
   async writeBlocks(
     blocks: NotionBlock[],
-    format: ExportFormat,
+    format: Exporter,
     outputPath: string,
     operationId?: string
   ): Promise<string> {
@@ -150,7 +150,7 @@ export class FileSystemManager {
     items: Array<{
       type: "database" | "page" | "blocks";
       data: NotionDatabase | NotionPage | NotionBlock[];
-      format: ExportFormat;
+      format: Exporter;
       outputPath?: string;
     }>
   ): Promise<string[]> {
@@ -229,7 +229,7 @@ export class FileSystemManager {
   /**
    * Get writer for format
    */
-  private getWriter(format: ExportFormat): FileWriter {
+  private getWriter(format: Exporter): FileWriter {
     const writer = this.writers.get(format);
     if (!writer) {
       throw new Error(`No writer available for format: ${format}`);

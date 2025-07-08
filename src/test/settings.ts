@@ -1,3 +1,4 @@
+import { log } from "$lib/log";
 import { readFileSync } from "fs";
 import path, { join } from "path";
 import { parse } from "yaml";

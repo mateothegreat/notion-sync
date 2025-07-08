@@ -1,7 +1,9 @@
+import { Exporter } from "$lib/exporters/exporter";
+import { NamingStrategy } from "$lib/util/normalization";
+import { OrganizationStrategy } from "$lib/util/organization";
 import * as fs from "fs/promises";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { ExportFormat } from "../exporters/exporter";
 import { definitions } from "./definitions";
 import {
   createCommandFlags,
@@ -26,12 +28,19 @@ describe("Config Loader", () => {
     }
   };
 
-  const base = {
+  const base: ResolvedCommandConfig<"export"> = {
+    "naming-strategy": NamingStrategy.TITLE_AND_ID,
+    "organization-strategy": OrganizationStrategy.HIERARCHICAL,
+    "include-archived": false,
     token: "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",
     timeout: 5000,
     concurrency: 5,
     retries: 1,
-    format: "json",
+    format: Exporter.JSON,
+    verbose: false,
+    flush: false,
+    pages: [],
+    output: undefined,
     "max-concurrency": 5,
     path: "",
     databases: [], // Required field
@@ -81,27 +90,27 @@ describe("Config Loader", () => {
 
     it("should load from environment variables", async () => {
       process.env.PATH = ".env";
-      process.env.FORMAT = ExportFormat.JSON;
+      process.env.FORMAT = Exporter.JSON;
       const config = await loadCommandConfig("export", {
         ...base,
         path: ".env"
       });
       expect(config.rendered.path).toBe(".env");
-      expect(config.rendered.format).toBe(ExportFormat.JSON);
+      expect(config.rendered.format).toBe(Exporter.JSON);
     });
 
     it("should load from YAML file", async () => {
-      vi.spyOn(fs, "readFile").mockResolvedValue(`path: .env\nformat: ${ExportFormat.JSON}`);
+      vi.spyOn(fs, "readFile").mockResolvedValue(`path: .env\nformat: ${Exporter.JSON}`);
       const config = await loadCommandConfig("export", { ...base });
-      expect(config.rendered.format).toBe(ExportFormat.JSON);
+      expect(config.rendered.format).toBe(Exporter.JSON);
     });
 
     it("should respect precedence: CLI > Env > YAML", async () => {
-      vi.spyOn(fs, "readFile").mockResolvedValue(`path: .env\nformat: ${ExportFormat.JSON}`);
+      vi.spyOn(fs, "readFile").mockResolvedValue(`path: .env\nformat: ${Exporter.JSON}`);
       process.env.PATH = ".env";
       const flags = { ...base };
       const config = await loadCommandConfig("export", flags);
-      expect(config.rendered.format).toBe(ExportFormat.JSON);
+      expect(config.rendered.format).toBe(Exporter.JSON);
     });
 
     /**
@@ -135,16 +144,19 @@ describe("Config Loader", () => {
         path: "./export",
         databases: [{ name: "test", id: "123" }],
         pages: undefined, // optional
-        format: "json",
+        format: Exporter.JSON,
         "max-concurrency": 10,
         "include-blocks": true,
         "include-comments": false,
         "include-properties": true,
-        output: undefined // optional
+        output: undefined, // optional
+        "naming-strategy": NamingStrategy.TITLE_AND_ID,
+        "organization-strategy": OrganizationStrategy.HIERARCHICAL,
+        "include-archived": false
       };
 
       expect(validConfig.path).toBe("./export");
-      expect(validConfig.format).toBe("json");
+      expect(validConfig.format).toBe(Exporter.JSON);
 
       // Type system should prevent accessing non-existent properties
       // The following would cause TypeScript errors if uncommented:

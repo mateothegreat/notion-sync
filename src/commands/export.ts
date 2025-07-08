@@ -9,8 +9,8 @@ import path from "path";
 import { lastValueFrom } from "rxjs";
 import { inspect } from "util";
 
-import { Exporter, ExportFormat } from "$lib/exporters/exporter";
-import { jsonExporterHook } from "$lib/exporters/json-exporter-hook";
+import { Exporter, ExporterPlugin } from "$lib/exporters/exporter";
+import { json } from "$lib/exporters/json";
 import { NotionObjectType } from "$lib/notion/types";
 import { ProgressService } from "../core/services/progress-service";
 import { FileSystemManager } from "../infrastructure/filesystem/file-system-manager";
@@ -18,7 +18,7 @@ import { BaseCommand } from "../lib/commands/base-command";
 import { createCommandFlags, loadCommandConfig, ResolvedCommandConfig } from "../lib/config/loader";
 import { ControlPlane, createControlPlane } from "../lib/control-plane/control-plane";
 import { ExportService } from "../lib/export/export-service";
-import { NotionClient } from "../lib/notion/notion-client";
+import { NotionClient } from "../lib/notion/client";
 import { NotionConfig } from "../shared/types";
 
 export default class Export extends BaseCommand<typeof Export> {
@@ -37,7 +37,7 @@ export default class Export extends BaseCommand<typeof Export> {
   private notionClient?: NotionClient;
   private fileSystemManager: FileSystemManager;
   private exportConfig: ResolvedCommandConfig<"export">;
-  private exporters: Exporter[] = [];
+  private exporters: ExporterPlugin[] = [];
 
   public async run(): Promise<void> {
     try {
@@ -45,9 +45,9 @@ export default class Export extends BaseCommand<typeof Export> {
       this.exportConfig = (await loadCommandConfig("export", flags)).rendered;
 
       this.exporters = [
-        jsonExporterHook(
+        json(
           {
-            formats: [ExportFormat.JSON],
+            formats: [Exporter.JSON],
             types: [NotionObjectType.DATABASE, NotionObjectType.PAGE]
           },
           this.exportConfig
@@ -322,6 +322,7 @@ export default class Export extends BaseCommand<typeof Export> {
       this.exporters.filter((e) => e.config.types.includes(NotionObjectType.DATABASE)),
       databases
     );
+
     await this.processPages(exporter.id, pages);
 
     // if (configuration.databases?.length > 0) {
@@ -360,19 +361,12 @@ export default class Export extends BaseCommand<typeof Export> {
     const processedPageIds = new Set<string>();
 
     try {
-      // Discover all databases
-      log.info("searching for databases...");
-      const allDatabases = await this.notionClient.getDatabases();
-
-      for (const database of allDatabases) {
+      for (const database of await this.notionClient.getDatabases()) {
         databases.push(database.id);
-        log.info(`found database: ${database.title || database.id}`);
       }
 
-      // Discover all pages (including those not in databases)
-      log.info("searching for standalone pages...");
+      log.success(`discovered ${databases.length} databases...`);
 
-      // Use search API to find all pages
       let hasMore = true;
       let nextCursor: string | undefined = undefined;
 
@@ -413,15 +407,12 @@ export default class Export extends BaseCommand<typeof Export> {
    * Process pages for export with enhanced data collection.
    */
   private async processPages(exportId: string, pageIds: string[]): Promise<void> {
-    if (!this.notionClient || !this.progressService) return;
-
     await this.progressService.startSection(exportId, "pages", pageIds.length);
 
     for (const pageId of pageIds) {
       try {
         const page = await this.notionClient.getPage(pageId);
 
-        // Write page to output
         for (const exporter of this.exporters.filter((e) => e.config.types.includes(NotionObjectType.PAGE))) {
           await exporter.write(page);
         }
@@ -517,7 +508,7 @@ export default class Export extends BaseCommand<typeof Export> {
       try {
         const blocksResult = await this.notionClient.getBlocks(blockId);
 
-        for (const block of blocksResult.results) {
+        for (const block of blocksResult) {
           allBlocks.push(block);
 
           // Recursively export child blocks if they exist
@@ -527,8 +518,8 @@ export default class Export extends BaseCommand<typeof Export> {
           }
         }
 
-        hasMore = blocksResult.hasMore;
-        nextCursor = blocksResult.nextCursor;
+        hasMore = blocksResult.length === 100;
+        nextCursor = blocksResult[blocksResult.length - 1].id;
       } catch (error) {
         log.info(
           `  ⚠️  Failed to get blocks for ${blockId}: ${error instanceof Error ? error.message : "Unknown error"}`
@@ -543,7 +534,7 @@ export default class Export extends BaseCommand<typeof Export> {
   /**
    * Process databases for export with enhanced data collection.
    */
-  private async processDatabases(exportId: string, exporters: Exporter[], ids: string[]): Promise<void> {
+  private async processDatabases(exportId: string, exporters: ExporterPlugin[], ids: string[]): Promise<void> {
     if (!this.notionClient || !this.progressService) return;
 
     await this.progressService.startSection(exportId, "databases", ids.length);
@@ -552,7 +543,7 @@ export default class Export extends BaseCommand<typeof Export> {
       try {
         // 1. First export the database metadata
         const database = await this.notionClient.getDatabase(databaseId);
-        log.debugging.inspect("processDatabases", { databaseId, name: database.title });
+        log.debugging.inspect("processDatabases", { databaseId, name: database });
         for (const exporter of exporters) {
           await exporter.write(database);
         }

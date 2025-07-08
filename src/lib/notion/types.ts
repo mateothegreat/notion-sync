@@ -1,3 +1,9 @@
+export interface NotionQueryResult<T extends NotionObject> {
+  results: T[];
+  hasMore: boolean;
+  nextCursor?: string;
+}
+
 export class NotionObject {
   id: string;
   type: NotionObjectType;
@@ -38,28 +44,6 @@ export interface NotionPage extends NotionObject {
   archived: boolean;
 }
 
-export class NotionDatabase extends NotionObject {
-  public title: string;
-  public description: string;
-  public properties: Record<string, NotionProperty>;
-  public parent: NotionParent;
-  public url: string;
-  public archived: boolean;
-  public name: string;
-
-  constructor(data: NotionDatabase) {
-    super(data);
-
-    this.type = NotionObjectType.DATABASE;
-    this.title = data.title;
-    this.description = data.description;
-    this.properties = data.properties;
-    this.parent = data.parent;
-    this.url = data.url;
-    this.archived = data.archived;
-  }
-}
-
 export interface NotionBlock extends NotionObject {
   type: NotionObjectType.BLOCK;
   blockType: string;
@@ -74,65 +58,11 @@ export interface NotionParent {
   page_id?: string;
 }
 
-export interface NotionProperty {
-  id: string;
-  name: string;
-  type: string;
-  config: Record<string, any>;
-}
-
 export interface NotionComment extends NotionObject {
   type: NotionObjectType.COMMENT;
   parent: NotionParent;
   rich_text: any[];
 }
-
-/**
- * Represents a Notion property item with standardized structure.
- * Maps to Notion's PropertyItemObjectResponse union type.
- */
-export interface NotionPropertyItem {
-  id?: string;
-  type: PropertyItemType;
-  object: "property_item" | "list";
-  results?: NotionPropertyItem[];
-  has_more?: boolean;
-  next_cursor?: string | null;
-  property_item?: {
-    id: string;
-    type: PropertyItemType;
-    [key: string]: any;
-  };
-}
-
-/**
- * Property types supported by Notion API for property items.
- */
-export type PropertyItemType =
-  | "property_item"
-  | "number"
-  | "url"
-  | "select"
-  | "multi_select"
-  | "status"
-  | "date"
-  | "email"
-  | "phone_number"
-  | "checkbox"
-  | "files"
-  | "created_by"
-  | "created_time"
-  | "last_edited_by"
-  | "last_edited_time"
-  | "formula"
-  | "button"
-  | "unique_id"
-  | "verification"
-  | "title"
-  | "rich_text"
-  | "people"
-  | "relation"
-  | "rollup";
 
 export interface NotionWorkspace {
   id: string;

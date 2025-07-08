@@ -15,10 +15,23 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "paths": {
+      // src
+      "$core/*": ["./src/core/*"],
+      "$shared/*": ["./src/shared/*"],
+      // lib
+      "$commands/*": ["./src/lib/commands/*"],
       "$lib/*": ["./src/lib/*"],
-      "$core/*": ["./src/core/*"]
+      "$config/*": ["./src/lib/config/*"],
+      "$control-plane/*": ["./src/lib/control-plane/*"],
+      "$export/*": ["./src/lib/exporters/*"],
+      "$notion/*": ["./src/lib/notion/*"],
+      "$objects/*": ["./src/lib/objects/*"],
+      "$renderers/*": ["./src/lib/renderers/*"],
+      "$util/*": ["./src/lib/util/*"],
+      // test
+      "$test/*": ["./src/test/*"]
     }
   },
   "include": ["./src/**/*"],
-  "exclude": ["./src/old/**/*", "./src/infrastructure"]
+  "exclude": ["./src/old/**/*", "./src/infrastructure", "**/__tests__"]
 }

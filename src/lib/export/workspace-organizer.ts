@@ -4,7 +4,7 @@
  * Organizes exported files in a logical directory structure
  */
 
-import { ExportFormat } from "$lib/exporters/exporter";
+import { Exporter } from "$lib/exporters/exporter";
 import { NotionDatabase, NotionPage } from "$lib/notion/types";
 import { promises as fs } from "fs";
 import path from "path";
@@ -60,7 +60,7 @@ export class WorkspaceOrganizer implements DirectoryOrganizer {
   /**
    * Get the file path for a specific item
    */
-  getFilePath(item: NotionDatabase | NotionPage, basePath: string, format: ExportFormat): string {
+  getFilePath(item: NotionDatabase | NotionPage, basePath: string, format: Exporter): string {
     const directory =
       item.type === "database"
         ? this.getDatabasePath(item as NotionDatabase, basePath)
@@ -108,7 +108,7 @@ export class WorkspaceOrganizer implements DirectoryOrganizer {
   /**
    * Get the index file path for a directory
    */
-  getIndexFilePath(directoryPath: string, format: ExportFormat): string {
+  getIndexFilePath(directoryPath: string, format: Exporter): string {
     const extension = this.getExtensionForFormat(format);
     return path.join(directoryPath, `index${extension}`);
   }
@@ -255,13 +255,13 @@ export class WorkspaceOrganizer implements DirectoryOrganizer {
   /**
    * Get file extension for export format
    */
-  private getExtensionForFormat(format: ExportFormat): string {
+  private getExtensionForFormat(format: Exporter): string {
     switch (format) {
-      case ExportFormat.JSON:
+      case Exporter.JSON:
         return ".json";
-      case ExportFormat.MARKDOWN:
+      case Exporter.MARKDOWN:
         return ".md";
-      case ExportFormat.HTML:
+      case Exporter.HTML:
         return ".html";
       default:
         return ".txt";

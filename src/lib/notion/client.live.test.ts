@@ -1,12 +1,13 @@
+import { loadCommandConfig } from "$config/loader";
+import { TestContext } from "$test/extentions";
+import { getComplexityTimeout } from "$test/utils";
 import { afterAll, test as baseTest, describe, expect, vi } from "vitest";
-import { TestContext } from "../../../test/extentions";
-import { getComplexityTimeout } from "../../../test/utils";
-import { toNotionID } from "../../infrastructure/notion/util";
-import { config } from "../../lib/config-loader";
-import { NotionClient } from "./notion-client";
+import { NotionClient } from "./client";
+import { toNotionID } from "./util";
 
+const config = await loadCommandConfig("export", {});
 const test = baseTest.extend<TestContext>({
-  notionClient: ({}, use) => use(new NotionClient({ apiKey: config.token }))
+  notionClient: ({}, use) => use(new NotionClient({ apiKey: config.rendered.token }))
 });
 
 // These tests require a valid Notion integration token and a test workspace

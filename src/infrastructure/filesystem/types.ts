@@ -4,7 +4,7 @@
  * Core types for the file system implementation
  */
 
-import { ExportFormat } from "$lib/exporters/exporter";
+import { Exporter } from "$lib/exporters/exporter";
 import { NotionBlock, NotionDatabase, NotionPage } from "$lib/notion/types";
 
 /**
@@ -99,7 +99,7 @@ export interface DirectoryOrganizer {
   /**
    * Get the file path for a specific item
    */
-  getFilePath(item: NotionDatabase | NotionPage, basePath: string, format: ExportFormat): string;
+  getFilePath(item: NotionDatabase | NotionPage, basePath: string, format: Exporter): string;
 
   /**
    * Create the directory structure
@@ -109,7 +109,7 @@ export interface DirectoryOrganizer {
   /**
    * Get the index file path for a directory
    */
-  getIndexFilePath(directoryPath: string, format: ExportFormat): string;
+  getIndexFilePath(directoryPath: string, format: Exporter): string;
 }
 
 /**

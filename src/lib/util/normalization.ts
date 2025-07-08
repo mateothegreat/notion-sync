@@ -1,8 +1,10 @@
+import { log } from "$lib/log";
 import { NotionDatabase, NotionObject, NotionPage } from "$lib/notion/types";
 
 export enum NamingStrategy {
   ID = "id",
   TITLE = "title",
+  TITLE_AND_ID = "title-and-id",
   SLUG = "slug",
   TIMESTAMP = "timestamp"
 }
@@ -43,6 +45,15 @@ export const normalize = (item: NotionObject, namingStrategy: NamingStrategy): s
         return sanitize((item as NotionDatabase).title || item.id);
       } else if (item.type === "page") {
         return sanitize((item as NotionPage).title || item.id);
+      } else {
+        return item.id;
+      }
+    case NamingStrategy.TITLE_AND_ID:
+      log.debugging.inspect("item", { item, santized: sanitize((item as NotionDatabase).title) });
+      if (item.type === "database") {
+        return `${sanitize((item as NotionDatabase).title || item.id)}-${item.id}`;
+      } else if (item.type === "page") {
+        return `${sanitize((item as NotionPage).title || item.id)}-${item.id}`;
       } else {
         return item.id;
       }

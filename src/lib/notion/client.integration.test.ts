@@ -1,17 +1,20 @@
+import { loadCommandConfig } from "$config/loader";
+import { log } from "$lib/log";
 import { beforeEach, describe, expect, it, suite, test } from "vitest";
-import { config } from "../config/config-loader";
-import { log } from "../log";
-import { NotionClient } from "./notion-client";
+import { NotionClient } from "./client";
 
 let notionClient: NotionClient;
+const config = await loadCommandConfig("export", {
+  token: "secret_" + "a".repeat(43)
+});
 
 test("config should render", () => {
-  expect(config.token).toBeDefined();
+  expect(config.rendered.token).toBeDefined();
 });
 
 beforeEach(() => {
   notionClient = new NotionClient({
-    apiKey: config.token,
+    apiKey: config.rendered.token,
     apiVersion: "2022-06-28",
     baseUrl: "https://api.notion.com",
     timeout: 30000,

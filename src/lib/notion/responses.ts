@@ -1,5 +1,3 @@
-// Query a database response
-// https://developers.notion.com/reference/post-database-query
 export interface QueryDatabaseResponse {
   object: string;
   results: PageObject[];
@@ -9,17 +7,11 @@ export interface QueryDatabaseResponse {
   page?: Record<string, never>;
 }
 
-// Retrieve a database response
-// https://developers.notion.com/reference/retrieve-a-database
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
 export type RetrieveDatabaseResponse = DatabaseObject;
 
-// Retrieve a block response
 // https://developers.notion.com/reference/retrieve-a-block
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
 export type RetrieveBlockResponse = BlockObject;
 
-// Retrieve block children response
 // https://developers.notion.com/reference/get-block-children
 export interface RetrieveBlockChildrenResponse {
   object: string;
@@ -121,7 +113,6 @@ interface Equation {
   expression: string;
 }
 
-// Database object
 // https://developers.notion.com/reference/database
 interface DatabaseObject {
   object: string;
@@ -228,7 +219,6 @@ interface RollupConfiguration {
   function: string;
 }
 
-// Page object
 // https://developers.notion.com/reference/page
 export interface PageObject {
   object: string;
@@ -310,7 +300,6 @@ interface RollupProperty {
   results?: string[];
 }
 
-// Block object
 // https://developers.notion.com/reference/block
 export interface BlockObject {
   object: string;

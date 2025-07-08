@@ -5,7 +5,7 @@
  */
 
 import { ResolvedCommandConfig } from "$lib/config/loader";
-import { ExportFormat } from "$lib/exporters/exporter";
+import { Exporter } from "$lib/exporters/exporter";
 import { Observable } from "rxjs";
 import { ExportError, ValidationError } from "../../shared/errors";
 import { Entity, ErrorInfo, ExportStatus, ProgressInfo } from "../../shared/types";
@@ -49,7 +49,7 @@ export class Export implements Entity {
       throw new ValidationError("At least one database or page must be specified");
     }
 
-    if (!Object.values(ExportFormat).includes(this.configuration.format)) {
+    if (!Object.values(Exporter).includes(this.configuration.format)) {
       throw new ValidationError(`Invalid export format: ${this.configuration.format}`);
     }
   }

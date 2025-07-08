@@ -3,7 +3,7 @@ import { OperationTypeAwareLimiter, type OperationContext, type OperationType } 
 
 describe("OperationTypeAwareLimiter", () => {
   let limiter: OperationTypeAwareLimiter;
-  let mockDateNow: vi.SpyInstance;
+  let mockDateNow = vi.spyOn(Date, "now");
   let currentTime: number;
 
   beforeEach(() => {
@@ -155,7 +155,7 @@ describe("OperationTypeAwareLimiter", () => {
       limiter.updateFromHeaders(headers, 250, "pages", false);
 
       const globalStats = limiter.getGlobalStats();
-      expect(globalStats.lastHeaderUpdate).toBeCloseTo(currentTime / 1000, 0);
+      expect(globalStats.headerUpdateFrequency).toBeCloseTo(currentTime / 1000, 0);
     });
 
     it("should track response times from headers", () => {
