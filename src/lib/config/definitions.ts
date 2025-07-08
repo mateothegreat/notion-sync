@@ -1,7 +1,20 @@
 import { ExportFormat } from "$lib/exporters/exporter";
+import util from "$lib/util";
 import { Flags } from "@oclif/core";
 import { Flag } from "@oclif/core/lib/interfaces";
 import { z } from "zod";
+
+// @mark Command Configuration Definitions
+
+export interface Database {
+  name: string;
+  id: string;
+}
+
+export interface Page {
+  name: string;
+  id: string;
+}
 
 /**
  * Configuration options for command-line flags and configuration parsing.
@@ -23,16 +36,6 @@ export interface ConfigOption {
 
 // Helper to ensure each definition conforms to ConfigOption while preserving exact keys
 const createDefinitions = <T extends Record<string, ConfigOption>>(defs: T): T => defs;
-
-export interface Database {
-  name: string;
-  id: string;
-}
-
-export interface Page {
-  name: string;
-  id: string;
-}
 
 export const definitions = createDefinitions({
   /**
@@ -100,6 +103,26 @@ export const definitions = createDefinitions({
       default: 3
     }),
     schema: () => z.number()
+  },
+  "naming-strategy": {
+    name: "naming-strategy",
+    variants: ["NAMING_STRATEGY", "naming-strategy"],
+    commands: ["export"],
+    flag: Flags.string({
+      description: "Naming strategy for exported files.",
+      default: util.normalization.NamingStrategy.TITLE
+    }),
+    schema: () => z.nativeEnum(util.normalization.NamingStrategy)
+  },
+  "organization-strategy": {
+    name: "organization-strategy",
+    variants: ["ORGANIZATION_STRATEGY", "organization-strategy"],
+    commands: ["export"],
+    flag: Flags.string({
+      description: "Organization strategy for exported files.",
+      default: util.organization.OrganizationStrategy.FLAT
+    }),
+    schema: () => z.nativeEnum(util.organization.OrganizationStrategy)
   },
 
   /**

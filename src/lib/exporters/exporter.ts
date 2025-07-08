@@ -12,6 +12,7 @@ export interface ExportHookConfig {
 }
 
 export interface Exporter {
+  id: string;
   config: ExportHookConfig;
   write: (obj: NotionObject) => Promise<void>;
 }

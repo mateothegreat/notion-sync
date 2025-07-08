@@ -7,7 +7,7 @@
  */
 
 import { ResolvedCommandConfig } from "$lib/config/loader";
-import { Client } from "@notionhq/client";
+import { Client, GetDatabaseParameters, GetPageParameters } from "@notionhq/client";
 import { promises as fs } from "fs";
 import path from "path";
 import { BehaviorSubject, from, merge, Observable, of, Subject, throwError } from "rxjs";
@@ -256,7 +256,7 @@ export class ObservableWorkspaceExporter {
       mergeMap((dir) =>
         from(fs.mkdir(dir, { recursive: true })).pipe(
           tap(() => {
-            this.eventPublisher(FileSystemEvents.directoryCreated(dir, "export")).subscribe();
+            this.eventPublisher(FileSystemEvents.directoryCreated(dir)).subscribe();
           }),
           catchError((error): Observable<any> => {
             if (error.code !== "EEXIST") {
@@ -274,8 +274,7 @@ export class ObservableWorkspaceExporter {
             return of(undefined);
           })
         )
-      ),
-      map(() => undefined)
+      )
     );
   }
 
@@ -340,7 +339,7 @@ export class ObservableWorkspaceExporter {
       mergeMap(
         (databaseId) =>
           this.apiLimiter
-            .run(() => from(this.client.databases.retrieve({ database_id: databaseId })))
+            .run(() => from(this.client.databases.retrieve({ database_id: databaseId } as GetDatabaseParameters)))
             .pipe(
               tap(() => {
                 processed++;
@@ -384,7 +383,7 @@ export class ObservableWorkspaceExporter {
       mergeMap(
         (pageId) =>
           this.apiLimiter
-            .run(() => from(this.client.pages.retrieve({ page_id: pageId })))
+            .run(() => from(this.client.pages.retrieve({ page_id: pageId } as GetPageParameters)))
             .pipe(
               tap(() => {
                 processed++;

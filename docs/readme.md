@@ -55,11 +55,6 @@ Notion Sync is a tool for importing and exporting content to and from Notion.
 - Beautiful console output with progress indicators.
 - Error reporting and summary statistics.
 
-## Example Usage (example-usage.ts)
-
-- Practical example of how to use the exporter.
-- Shows error handling and result processing.
-
 ## Prerequisites
 
 ### Notion API key
@@ -67,7 +62,7 @@ Notion Sync is a tool for importing and exporting content to and from Notion.
 You need to have a Notion API key. You can get one from the Notion API documentation.
 
 > [!NOTE]
-> You can get your API key from <https://www.notion.so/profile/integrations>.
+> You can get your API key from [https://www.notion.so/profile/integrations](https://www.notion.so/profile/integrations).
 
 ### Config file
 
@@ -97,7 +92,7 @@ import { notion } from "@mateothegreat/notion-sync";
 
 ### Discovering the Notion API
 
-You can discover the API by using this postman collection at <https://www.postman.com/notionhq/workspace/notion-s-api-workspace>.
+You can discover the API by using this postman collection at [https://www.postman.com/notionhq/workspace/notion-s-api-workspace](https://www.postman.com/notionhq/workspace/notion-s-api-workspace).
 
 #### Building
 

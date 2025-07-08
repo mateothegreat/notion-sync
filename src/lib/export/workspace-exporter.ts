@@ -126,17 +126,11 @@ export class WorkspaceExporter extends EventEmitter implements OperationEventEmi
     log.info("Starting workspace export", { exportId: export_.id });
 
     try {
-      // Create output directory structure
-      await this.createOutputDirectoryStructure(export_.configuration.outputPath);
+      await this.createOutputDirectoryStructure(export_.configuration.output);
 
-      // Start progress tracking
       await this.progressService.startTracking(export_.id);
 
-      // Export workspace metadata
       const workspaceInfo = await this.exportWorkspaceMetadata(export_);
-
-      // TODO: Add actual export logic for databases, pages, blocks, etc.
-      // This would be implemented by integrating with NotionClient and FileSystemManager
 
       const endTime = new Date();
 

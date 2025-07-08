@@ -19,6 +19,13 @@ export class ExportService {
     private progressService?: ProgressService
   ) {}
 
+  /**
+   * Create an export and publish the started event to the event bus.
+   *
+   * @param configuration - The configuration for the export.
+   *
+   * @returns The created export.
+   */
   async create(configuration: ResolvedCommandConfig<"export">): Promise<Export> {
     const exp = ExportFactory.create(configuration);
 

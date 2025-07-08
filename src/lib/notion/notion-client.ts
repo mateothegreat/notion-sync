@@ -248,7 +248,7 @@ export class NotionClient implements NotionApiClient {
   }
 
   private async execute<T>(operation: string, fn: () => Promise<T>): Promise<T> {
-    log.debug(`Executing Notion API call`, { operation });
+    log.debug(`executing Notion API call`, { operation });
     try {
       const result = await fn();
       this.updateRateLimitFromResponse(); // Placeholder for future implementation
@@ -369,10 +369,11 @@ export class NotionClient implements NotionApiClient {
   }
 
   private transformDatabase(notionDatabase: any): NotionDatabase {
-    return {
+    return new NotionDatabase({
       id: notionDatabase.id,
       type: NotionObjectType.DATABASE,
       title: this.extractTitle(notionDatabase),
+      name: this.extractTitle(notionDatabase),
       description: this.extractDescription(notionDatabase),
       properties: notionDatabase.properties || {},
       parent: notionDatabase.parent,
@@ -382,7 +383,7 @@ export class NotionClient implements NotionApiClient {
       lastEditedTime: notionDatabase.last_edited_time,
       createdBy: notionDatabase.created_by,
       lastEditedBy: notionDatabase.last_edited_by
-    };
+    });
   }
 
   private transformBlock(notionBlock: any): NotionBlock {

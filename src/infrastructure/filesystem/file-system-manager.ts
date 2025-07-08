@@ -41,7 +41,6 @@ export class FileSystemManager {
   private initializeWriters(): void {
     this.writers.set(ExportFormat.JSON, new JSONWriter(this.config, this.eventPublisher));
     this.writers.set(ExportFormat.MARKDOWN, new MarkdownWriter(this.config, this.eventPublisher));
-    // TODO: Add HTML and CSV writers
   }
 
   /**

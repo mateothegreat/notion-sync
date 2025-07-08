@@ -186,8 +186,7 @@ export class ControlPlane {
           catchError((error) => {
             this.hookManager.execute("error", { error, phase: "start" }).catch(console.error);
             return throwError(() => error);
-          }),
-          map(() => undefined)
+          })
         );
       })
     );
@@ -212,8 +211,7 @@ export class ControlPlane {
       catchError((error) => {
         this.hookManager.execute("error", { error, phase: "stop" }).catch(console.error);
         return throwError(() => error);
-      }),
-      map(() => undefined)
+      })
     );
   }
 
@@ -236,8 +234,7 @@ export class ControlPlane {
       catchError((error) => {
         this.hookManager.execute("error", { error, phase: "destroy" }).catch(console.error);
         return throwError(() => error);
-      }),
-      map(() => undefined)
+      })
     );
   }
 

@@ -4,19 +4,21 @@
     "baseUrl": ".",
     "rootDir": "./src",
     "outDir": "./dist",
-    "module": "esnext",
+    "module": "es2022",
+    "target": "ES2022",
     "moduleResolution": "node",
     "noEmit": false,
     "strict": true,
     "strictNullChecks": false,
-    "target": "ES2022",
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
     "paths": {
       "$lib/*": ["./src/lib/*"],
       "$core/*": ["./src/core/*"]
     }
   },
   "include": ["./src/**/*"],
-  "exclude": ["**/*test*", "./src/old/**/*"]
+  "exclude": ["./src/old/**/*", "./src/infrastructure"]
 }

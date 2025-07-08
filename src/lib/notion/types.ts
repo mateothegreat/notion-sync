@@ -1,10 +1,14 @@
-export interface NotionObject {
+export class NotionObject {
   id: string;
   type: NotionObjectType;
   createdTime: string;
   lastEditedTime: string;
   createdBy: NotionUser;
   lastEditedBy: NotionUser;
+
+  constructor(data: NotionObject) {
+    Object.assign(this, data);
+  }
 }
 
 export enum NotionObjectType {
@@ -34,14 +38,26 @@ export interface NotionPage extends NotionObject {
   archived: boolean;
 }
 
-export interface NotionDatabase extends NotionObject {
-  type: NotionObjectType.DATABASE;
-  title: string;
-  description: string;
-  properties: Record<string, NotionProperty>;
-  parent: NotionParent;
-  url: string;
-  archived: boolean;
+export class NotionDatabase extends NotionObject {
+  public title: string;
+  public description: string;
+  public properties: Record<string, NotionProperty>;
+  public parent: NotionParent;
+  public url: string;
+  public archived: boolean;
+  public name: string;
+
+  constructor(data: NotionDatabase) {
+    super(data);
+
+    this.type = NotionObjectType.DATABASE;
+    this.title = data.title;
+    this.description = data.description;
+    this.properties = data.properties;
+    this.parent = data.parent;
+    this.url = data.url;
+    this.archived = data.archived;
+  }
 }
 
 export interface NotionBlock extends NotionObject {

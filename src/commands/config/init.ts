@@ -1,5 +1,3 @@
-import { Config } from "$lib/config/config";
-import { ExportFormat } from "$lib/exporters/exporter";
 import { Command, Flags } from "@oclif/core";
 import * as fs from "fs/promises";
 import { createCommandFlags } from "../../lib/config/loader";
@@ -54,26 +52,26 @@ export default class Init extends Command {
     }
 
     this.log(`Initializing Notion Sync configuration file...`);
-    const config = new Config<"export">({
-      path: "./exports",
-      format: ExportFormat.JSON,
-      databases: [{ name: "Database 1", id: "1234567890" }],
-      pages: [{ name: "Page 1", id: "1234567890" }],
-      "max-concurrency": 10,
-      "include-archived": false,
-      "include-comments": false,
-      "include-properties": false,
-      "include-blocks": false,
-      retries: 3,
-      timeout: 10000,
-      token: "your-notion-api-token",
-      verbose: false,
-      flush: false,
-      concurrency: 10,
-      output: "./exports"
-    });
+    // const config = new Config<"export">({
+    //   path: "./exports",
+    //   format: ExportFormat.JSON,
+    //   databases: [{ name: "Database 1", id: "1234567890" }],
+    //   pages: [{ name: "Page 1", id: "1234567890" }],
+    //   "max-concurrency": 10,
+    //   "include-archived": false,
+    //   "include-comments": false,
+    //   "include-properties": false,
+    //   "include-blocks": false,
+    //   retries: 3,
+    //   timeout: 10000,
+    //   token: "your-notion-api-token",
+    //   verbose: false,
+    //   flush: false,
+    //   concurrency: 10,
+    //   output: "./exports"
+    // });
 
-    await fs.writeFile(flags.output, config.toYaml());
-    this.log(`✅ Configuration file created at: ${flags.output}`);
+    // await fs.writeFile(flags.output, config.toYaml());
+    // this.log(`✅ Configuration file created at: ${flags.output}`);
   }
 }
