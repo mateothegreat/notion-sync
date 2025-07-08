@@ -1,5 +1,6 @@
 import { log } from "$lib/log";
-import { NotionDatabase, NotionObject, NotionPage } from "$lib/notion/types";
+import { NotionObject, NotionSDKSearchResultDatabase, NotionSDKSearchResultPage } from "$lib/notion/types";
+import { getTitle } from "$lib/util/typing";
 
 export enum NamingStrategy {
   ID = "id",
@@ -15,6 +16,7 @@ export const sanitize = (filename: string): string => {
     .replace(/\s+/g, "_") // Replace spaces with underscores
     .replace(/_{2,}/g, "_") // Replace multiple underscores with single
     .replace(/^_|_$/g, "") // Remove leading/trailing underscores
+    .replace(/^-|-$/g, "") // Remove leading/trailing hyphens
     .substring(0, 255); // Limit length
 };
 
@@ -30,58 +32,41 @@ export const slug = (title: string): string => {
     .replace(/^-|-$/g, ""); // Remove leading/trailing hyphens
 };
 
-export const normalize = (item: NotionObject, namingStrategy: NamingStrategy): string => {
+/**
+ * Normalizes a Notion object to a string based on a naming strategy.
+ * It can handle different types of Notion objects, including pages and databases from API responses.
+ *
+ * @param item - The Notion object to normalize.
+ * @param namingStrategy - The strategy to use for naming.
+ * @returns The normalized string.
+ */
+export const normalize = (
+  item: NotionObject | NotionSDKSearchResultDatabase | NotionSDKSearchResultPage,
+  namingStrategy: NamingStrategy
+): string => {
+  const title = getTitle(item) || item.id;
+
   switch (namingStrategy) {
     case NamingStrategy.ID:
-      if (item.type === "database") {
-        return (item as NotionDatabase).id;
-      } else if (item.type === "page") {
-        return (item as NotionPage).id;
-      } else {
-        return item.id;
-      }
+      return item.id;
     case NamingStrategy.TITLE:
-      if (item.type === "database") {
-        return sanitize((item as NotionDatabase).title || item.id);
-      } else if (item.type === "page") {
-        return sanitize((item as NotionPage).title || item.id);
-      } else {
-        return item.id;
-      }
+      return sanitize(title);
     case NamingStrategy.TITLE_AND_ID:
-      log.debugging.inspect("item", { item, santized: sanitize((item as NotionDatabase).title) });
-      if (item.type === "database") {
-        return `${sanitize((item as NotionDatabase).title || item.id)}-${item.id}`;
-      } else if (item.type === "page") {
-        return `${sanitize((item as NotionPage).title || item.id)}-${item.id}`;
-      } else {
-        return item.id;
-      }
+      log.debugging.inspect("item", { item, santized: sanitize(title) });
+      return `${sanitize(title)}-${item.id}`;
     case NamingStrategy.SLUG:
-      if (item.type === "database") {
-        return slug((item as NotionDatabase).title || item.id);
-      } else if (item.type === "page") {
-        return slug((item as NotionPage).title || item.id);
-      } else {
-        return item.id;
-      }
+      return slug(title);
     case NamingStrategy.TIMESTAMP:
-      if (item.type === "database") {
-        return `${Date.now()}_${sanitize((item as NotionDatabase).title || item.id)}`;
-      } else if (item.type === "page") {
-        return `${Date.now()}_${sanitize((item as NotionPage).title || item.id)}`;
-      } else {
-        return item.id;
-      }
+      return `${Date.now()}_${sanitize(title)}`;
     default:
       return item.id;
   }
 };
 
-export const normalizeDatabase = (database: NotionDatabase, namingStrategy: NamingStrategy): string => {
+export const normalizeDatabase = (database: NotionSDKSearchResultDatabase, namingStrategy: NamingStrategy): string => {
   return normalize(database, namingStrategy);
 };
 
-export const normalizePage = (page: NotionPage, namingStrategy: NamingStrategy): string => {
+export const normalizePage = (page: NotionSDKSearchResultPage, namingStrategy: NamingStrategy): string => {
   return normalize(page, namingStrategy);
 };

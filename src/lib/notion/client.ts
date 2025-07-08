@@ -14,6 +14,7 @@
  */
 
 import { Client } from "@notionhq/client";
+import { QueryDatabaseParameters, SearchParameters } from "@notionhq/client/build/src/api-endpoints";
 import { NotionConfig, RateLimitInfo } from "src/shared/types";
 import { RateLimitError } from "../../shared/errors/index";
 import { log } from "../log";
@@ -26,6 +27,7 @@ import {
   NotionProperty,
   NotionPropertyItem,
   NotionQueryResult,
+  NotionSearchResponse,
   NotionUser,
   NotionWorkspace
 } from "./types";
@@ -33,11 +35,11 @@ import {
 export interface NotionApiClient {
   getPage(pageId: string): Promise<NotionPage>;
   getDatabase(databaseId: string): Promise<NotionDatabase>;
-  getDatabases(): Promise<NotionDatabase[]>;
-  queryDatabase(databaseId: string, options?: any): Promise<NotionQueryResult<NotionPage>>;
+  getDatabases(query?: string): Promise<NotionDatabase[]>;
+  queryDatabase(params: QueryDatabaseParameters): Promise<NotionQueryResult<NotionPage>>;
   getBlocks(blockId: string): Promise<NotionBlock[]>;
   getUsers(): Promise<NotionUser[]>;
-  search(query: string, options?: any): Promise<any>;
+  search<T extends SearchParameters>(parms: T): Promise<NotionSearchResponse<T>>;
   getRateLimitInfo(): RateLimitInfo | null;
   getComments(blockId: string): Promise<NotionComment[]>;
   getPropertyItem(pageId: string, propertyId: string): Promise<NotionPropertyItem>;
@@ -75,6 +77,8 @@ export class NotionClient implements NotionApiClient {
    * Get all databases.
    *
    * @returns {Promise<NotionDatabase[]>} - All matching databases.
+   *
+   * @throws {NotionApiError} - If the API call fails.
    */
   async getDatabases(query?: string): Promise<NotionDatabase[]> {
     return this.execute(`databases.list`, async () => {
@@ -85,17 +89,13 @@ export class NotionClient implements NotionApiClient {
           value: "database"
         }
       });
-      return response.results.map((database) => transformers.database(database));
+      return response.results.map((result) => transformers.database(result));
     });
   }
 
-  async queryDatabase(databaseId: string, options: any = {}): Promise<NotionQueryResult<NotionPage>> {
-    return this.execute(`databases.query for ${databaseId}`, async () => {
-      const response = await this.client.databases.query({
-        database_id: databaseId,
-        ...options
-      });
-
+  async queryDatabase(params: QueryDatabaseParameters): Promise<NotionQueryResult<NotionPage>> {
+    return this.execute(`databases.query for ${params.database_id}`, async () => {
+      const response = await this.client.databases.query(params);
       return {
         results: response.results.map((page) => transformers.page(page)),
         hasMore: response.has_more,
@@ -120,13 +120,34 @@ export class NotionClient implements NotionApiClient {
     });
   }
 
-  async search(query: string, options: any = {}): Promise<any> {
-    return this.execute(`notion-client.search(${query})`, () =>
-      this.client.search({
-        query,
-        ...options
-      })
-    );
+  /**
+   * Search for pages, databases, or both, and return a type-safe response.
+   *
+   * @param {SearchParameters} parms - The search parameters.
+   *
+   * @returns {Promise<NotionSearchResponse<T>>} - The search response.
+   */
+  async search<T>(parms: SearchParameters): Promise<NotionSearchResponse<T>> {
+    return this.execute(`notion-client.search(${JSON.stringify(parms)})`, async () => {
+      const response = await this.client.search(parms);
+      const results = response.results.map((result) => {
+        if (result.object === "page") {
+          return transformers.page(result);
+        } else if (result.object === "database") {
+          return transformers.database(result);
+        } else {
+          throw new Error(`unsupported object type`, {
+            cause: result
+          });
+        }
+      });
+
+      return {
+        results,
+        hasMore: response.has_more,
+        nextCursor: response.next_cursor || undefined
+      };
+    });
   }
 
   getRateLimitInfo(): RateLimitInfo | null {
@@ -175,7 +196,7 @@ export class NotionClient implements NotionApiClient {
   async getDatabaseProperties(databaseId: string): Promise<NotionProperty[]> {
     return this.execute(`databases.properties.retrieve for ${databaseId}`, async () => {
       const database = await this.getDatabase(databaseId);
-      return Object.entries(database.properties).map(([name, property]) => ({
+      return Object.entries(database.properties).map(([name, property]: [string, any]) => ({
         id: property.id,
         name,
         type: property.type,
@@ -193,7 +214,10 @@ export class NotionClient implements NotionApiClient {
   async getPageProperties(pageId: string): Promise<NotionProperty[]> {
     return this.execute(`pages.properties.retrieve for ${pageId}`, async () => {
       const page = await this.getPage(pageId);
-      return Object.entries(page.properties).map(([name, property]) => ({
+      if (!page.properties) {
+        return [];
+      }
+      return Object.entries(page.properties).map(([name, property]: [string, any]) => ({
         id: property.id,
         name,
         type: property.type,

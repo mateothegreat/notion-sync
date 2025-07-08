@@ -1,9 +1,11 @@
-import tsconfigPaths from "vite-tsconfig-paths";
 import { defineConfig } from "vitest/config";
 
+const include = ["./src/**/*.test.ts"];
+const exclude = [];
+
 export default defineConfig({
-  plugins: [tsconfigPaths()],
   test: {
+    exclude,
     bail: 5,
     maxConcurrency: 10,
     passWithNoTests: false,
@@ -16,12 +18,15 @@ export default defineConfig({
     typecheck: {
       enabled: true
     },
+    benchmark: {
+      outputJson: "./coverage/benchmark.json"
+    },
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
       all: true,
-      include: ["src/**/*.ts"],
-      exclude: ["src/**/*.test.ts", "src/**/*.d.ts", "src/index.ts"],
+      include,
+      exclude,
       enabled: true,
       clean: true,
       ignoreEmptyLines: true,

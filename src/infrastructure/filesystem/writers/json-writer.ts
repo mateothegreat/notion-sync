@@ -81,7 +81,7 @@ export class JSONWriter extends BaseFileWriter {
   private formatDatabaseData(database: NotionDatabase): any {
     const data: any = {
       id: database.id,
-      type: "database",
+      object: "database",
       title: database.title,
       description: database.description,
       url: database.url,
@@ -111,7 +111,7 @@ export class JSONWriter extends BaseFileWriter {
   private formatPageData(page: NotionPage): any {
     const data: any = {
       id: page.id,
-      type: "page",
+      object: "page",
       title: page.title,
       url: page.url,
       archived: page.archived

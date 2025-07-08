@@ -1,17 +1,18 @@
-import { NotionObject, NotionObjectType, NotionParent } from "../types";
+import { DatabaseObjectResponse } from "@notionhq/client";
+import { NotionObject, NotionObjectType } from "./object";
+import { NotionParent } from "./parent";
 import { NotionProperty } from "./property";
 
 export class NotionDatabase extends NotionObject {
-  public title: string;
-  public description: string;
-  public properties: Record<string, NotionProperty>;
-  public parent: NotionParent;
-  public url: string;
-  public archived: boolean;
-
+  title: string;
+  description: string;
+  properties: Record<string, NotionProperty>;
+  icon: DatabaseObjectResponse["icon"];
+  cover: DatabaseObjectResponse["cover"];
+  isInline: boolean;
+  parent: NotionParent;
   constructor(data: NotionDatabase) {
     super(data);
-
     this.type = NotionObjectType.DATABASE;
     this.title = data.title;
     this.description = data.description;
@@ -19,5 +20,8 @@ export class NotionDatabase extends NotionObject {
     this.parent = data.parent;
     this.url = data.url;
     this.archived = data.archived;
+    this.icon = data.icon;
+    this.cover = data.cover;
+    this.isInline = data.isInline;
   }
 }

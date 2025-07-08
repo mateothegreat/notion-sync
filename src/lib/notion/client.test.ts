@@ -6,7 +6,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NotionConfig } from "../../shared/types";
 import { NotionClient } from "./client";
-import { NotionBlock, NotionDatabase, NotionObjectType, NotionQueryResult } from "./types";
 
 // Mock the @notionhq/client
 vi.mock("@notionhq/client", () => ({
@@ -178,32 +177,50 @@ describe("NotionClient", () => {
     });
 
     it("should query database successfully", async () => {
-      const mockQueryResult: NotionQueryResult<NotionDatabase> = {
+      const mockQueryResult: any = {
         results: [
           {
             id: "page-1",
+            object: "page",
             properties: {
               title: {
                 id: "title",
                 type: "title",
-                name: "Title",
-                config: {}
+                title: [
+                  {
+                    type: "text",
+                    text: {
+                      content: "Test Page",
+                      link: null
+                    },
+                    annotations: {
+                      bold: false,
+                      italic: false,
+                      strikethrough: false,
+                      underline: false,
+                      code: false,
+                      color: "default"
+                    },
+                    plain_text: "Test Page",
+                    href: null
+                  }
+                ]
               }
             },
             parent: { type: "database_id", database_id: "db-1" },
             url: "https://notion.so/page-1",
             archived: false,
-            createdTime: "2023-01-01T00:00:00.000Z",
-            lastEditedTime: "2023-01-01T00:00:00.000Z",
-            createdBy: { id: "user-1", type: "person" },
-            lastEditedBy: { id: "user-1", type: "person" },
-            type: NotionObjectType.DATABASE,
-            title: "Test Database",
-            description: "Test Description"
+            created_time: "2023-01-01T00:00:00.000Z",
+            last_edited_time: "2023-01-01T00:00:00.000Z",
+            created_by: { id: "user-1", type: "person" },
+            last_edited_by: { id: "user-1", type: "person" }
           }
         ],
-        hasMore: false,
-        nextCursor: null
+        has_more: false,
+        next_cursor: null,
+        object: "list",
+        type: "page_or_database",
+        page_or_database: {}
       };
 
       mockClient.databases.query.mockResolvedValue(mockQueryResult);
@@ -312,29 +329,24 @@ describe("NotionClient", () => {
 
   describe("block operations", () => {
     it("should fetch blocks successfully", async () => {
-      const mockBlocksResult: NotionQueryResult<NotionBlock> = {
+      const mockBlocksResult = {
         results: [
           {
             id: "block-1",
-            type: NotionObjectType.BLOCK,
-            content: {
-              paragraph: {
-                richText: [{ plainText: "Test content" }]
-              }
+            object: "block",
+            type: "paragraph",
+            paragraph: {
+              rich_text: [{ plain_text: "Test content" }]
             },
-            hasChildren: false,
+            has_children: false,
             archived: false,
             parent: { type: "page_id", page_id: "page-1" },
-            url: "https://notion.so/block-1",
-            createdTime: "2023-01-01T00:00:00.000Z",
-            lastEditedTime: "2023-01-01T00:00:00.000Z",
-            createdBy: { id: "user-1", type: "person" },
-            lastEditedBy: { id: "user-1", type: "person" },
-            blockType: "paragraph"
-          } as NotionBlock
-        ],
-        hasMore: false,
-        nextCursor: null
+            created_time: "2023-01-01T00:00:00.000Z",
+            last_edited_time: "2023-01-01T00:00:00.000Z",
+            created_by: { id: "user-1", type: "person" },
+            last_edited_by: { id: "user-1", type: "person" }
+          }
+        ]
       };
 
       mockClient.blocks.children.list.mockResolvedValue(mockBlocksResult);
@@ -440,10 +452,10 @@ describe("NotionClient", () => {
 
       mockClient.search.mockResolvedValue(mockSearchResult);
 
-      const result = await notionClient.search("test query");
+      const result = await notionClient.search<"page" | "database">({ query: "test query" });
 
-      expect(result.results).toHaveLength(1);
-      expect(result.results[0].id).toBe("page-1");
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe("page-1");
       expect(mockClient.search).toHaveBeenCalledWith({
         query: "test query"
       });
@@ -626,19 +638,19 @@ describe("NotionClient", () => {
     });
 
     it("should extract title from title property", async () => {
-      const mockDatabase: NotionDatabase = {
+      const mockDatabase = {
         id: "db-1",
-        type: NotionObjectType.DATABASE,
-        title: "Test Database",
-        description: "",
+        object: "database",
+        title: [{ plain_text: "Test Database" }],
+        description: [{ plain_text: "Test Description" }],
         properties: {},
         parent: { type: "workspace" },
-        url: "https://notion.so/db-1" as any,
+        url: "https://notion.so/db-1",
         archived: false,
-        createdTime: "2023-01-01T00:00:00.000Z",
-        lastEditedTime: "2023-01-01T00:00:00.000Z",
-        createdBy: { id: "user-1", type: "person" },
-        lastEditedBy: { id: "user-1", type: "person" }
+        created_time: "2023-01-01T00:00:00.000Z",
+        last_edited_time: "2023-01-01T00:00:00.000Z",
+        created_by: { id: "user-1", type: "person" },
+        last_edited_by: { id: "user-1", type: "person" }
       };
 
       mockClient.databases.retrieve.mockResolvedValue(mockDatabase);

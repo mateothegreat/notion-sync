@@ -149,10 +149,10 @@ export class WorkspaceOrganizer implements DirectoryOrganizer {
 
     // Add parent hierarchy if available
     if (database.parent) {
-      if (database.parent.type === "page_id") {
-        parts.push("pages", database.parent.page_id!);
-      } else if (database.parent.type === "database_id") {
-        parts.push("databases", database.parent.database_id!);
+      if (database.parent.type === "page") {
+        parts.push("pages", database.parent.id);
+      } else if (database.parent.type === "database") {
+        parts.push("databases", database.parent.id);
       }
     }
 
@@ -170,10 +170,10 @@ export class WorkspaceOrganizer implements DirectoryOrganizer {
 
     // Add parent hierarchy if available
     if (page.parent) {
-      if (page.parent.type === "page_id") {
-        parts.push("pages", page.parent.page_id!);
-      } else if (page.parent.type === "database_id") {
-        parts.push("databases", page.parent.database_id!);
+      if (page.parent.type === "page") {
+        parts.push("pages", page.parent.id);
+      } else if (page.parent.type === "database") {
+        parts.push("databases", page.parent.id);
       }
     }
 

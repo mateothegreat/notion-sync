@@ -1,3 +1,11 @@
+import {
+  NotionPropertyType,
+  PropertyTypeIdentifier,
+  PropertyTypeMap,
+  PropertyValueType,
+  ValidatePropertyStructure
+} from "$lib/util/typing";
+
 export interface NotionProperty {
   id: string;
   name: string;
@@ -11,43 +19,58 @@ export interface NotionProperty {
  */
 export interface NotionPropertyItem {
   id?: string;
-  type: NotionPropertyItemType;
+  type: NotionPropertyType;
   object: "property_item" | "list";
   results?: NotionPropertyItem[];
   has_more?: boolean;
   next_cursor?: string | null;
   property_item?: {
     id: string;
-    type: NotionPropertyItemType;
+    type: NotionPropertyType;
     [key: string]: any;
   };
 }
 
 /**
- * Property types supported by Notion API for property items.
+ * Utility type for creating property-specific interfaces with enhanced type safety.
+ * Demonstrates advanced generic constraints and conditional type composition.
  */
-export type NotionPropertyItemType =
-  | "property_item"
-  | "number"
-  | "url"
-  | "select"
-  | "multi_select"
-  | "status"
-  | "date"
-  | "email"
-  | "phone_number"
-  | "checkbox"
-  | "files"
-  | "created_by"
-  | "created_time"
-  | "last_edited_by"
-  | "last_edited_time"
-  | "formula"
-  | "button"
-  | "unique_id"
-  | "verification"
-  | "title"
-  | "rich_text"
-  | "people"
-  | "relation"
-  | "rollup";
+export type NotionPropertySpecificInterface<T extends NotionPropertyType> = {
+  propertyType: T;
+  value: PropertyValueType<T>;
+  metadata: {
+    typeIdentifier: PropertyTypeIdentifier<T>;
+    isValid: ValidatePropertyStructure<PropertyTypeMap[T]> extends never ? false : true;
+  };
+};
+
+/**
+ * Type composition for creating property collections with type safety.
+ */
+export type NotionPropertyCollection<T extends readonly NotionPropertyType[]> = {
+  [K in T[number] as `${K}Properties`]: PropertyTypeMap[K][];
+};
+
+/**
+ * Type-safe property selector using template literal types and key mapping.
+ */
+export type NotionPropertySelector<T extends NotionPropertyType> = `select_${T}` | `filter_${T}` | `sort_${T}`;
+
+/**
+ * Error handling type for property validation failures.
+ * Uses branded types and discriminated unions for comprehensive error handling.
+ */
+export type NotionPropertyValidationError<T extends NotionPropertyType> = {
+  type: "validation_error";
+  propertyType: T;
+  message: string;
+  code: `INVALID_${Uppercase<T>}_PROPERTY`;
+};
+
+/**
+ * Polymorphic result type for property operations with better error handling
+ * using generic constraints and discriminated union patterns.
+ */
+export type NotionPropertyOperationResult<T extends NotionPropertyType> =
+  | { success: true; data: PropertyTypeMap[T] }
+  | { success: false; error: NotionPropertyValidationError<T> };

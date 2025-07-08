@@ -1,10 +1,15 @@
 import { ResolvedCommandConfig } from "$lib/config/loader";
 import { log } from "$lib/log";
-import { NotionDatabase, NotionObject, NotionObjectType, NotionPage } from "$lib/notion/types";
+import {
+  NotionObject,
+  NotionObjectType,
+  NotionSDKSearchResultDatabase,
+  NotionSDKSearchResultPage
+} from "$lib/notion/types";
 import util from "$lib/util";
 import { tskit } from "@mateothegreat/ts-kit";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Exporter, ExportHookConfig } from "./exporter";
+import { Exporter, exporters, ExportHookConfig } from "./exporter";
 import { json } from "./json";
 
 vi.mock("$lib/log", () => ({
@@ -48,12 +53,12 @@ describe("jsonExporterHook", () => {
 
   it('should return an exporter with id "json"', () => {
     const exporter = json(mockHookConfig, mockExporterConfig);
-    expect(exporter.id).toBe("json");
+    expect(exporter.id).toBe(exporters.json.id);
     expect(exporter.config).toBe(mockHookConfig);
   });
 
   describe("write", () => {
-    const mockNotionPage: NotionPage = {
+    const mockNotionPage: NotionSDKSearchResultPage = {
       id: "123",
       type: NotionObjectType.PAGE,
       createdTime: "2023-01-01T00:00:00.000Z",
@@ -75,7 +80,7 @@ describe("jsonExporterHook", () => {
       lastEditedTime: "2023-01-01T00:00:00.000Z",
       createdBy: { id: "user-id", type: "person" },
       lastEditedBy: { id: "user-id", type: "person" }
-    } as unknown as NotionDatabase;
+    } as unknown as NotionSDKSearchResultDatabase;
 
     it("should write a JSON file for a given NotionObject", async () => {
       const exporter = json(mockHookConfig, mockExporterConfig);

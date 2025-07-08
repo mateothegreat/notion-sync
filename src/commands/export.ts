@@ -13,7 +13,6 @@ import { Exporter, ExporterPlugin } from "$lib/exporters/exporter";
 import { json } from "$lib/exporters/json";
 import { NotionObjectType } from "$lib/notion/types";
 import { ProgressService } from "../core/services/progress-service";
-import { FileSystemManager } from "../infrastructure/filesystem/file-system-manager";
 import { BaseCommand } from "../lib/commands/base-command";
 import { createCommandFlags, loadCommandConfig, ResolvedCommandConfig } from "../lib/config/loader";
 import { ControlPlane, createControlPlane } from "../lib/control-plane/control-plane";
@@ -35,7 +34,6 @@ export default class Export extends BaseCommand<typeof Export> {
   private exportService?: ExportService;
   private progressService?: ProgressService;
   private notionClient?: NotionClient;
-  private fileSystemManager: FileSystemManager;
   private exportConfig: ResolvedCommandConfig<"export">;
   private exporters: ExporterPlugin[] = [];
 
@@ -371,7 +369,7 @@ export default class Export extends BaseCommand<typeof Export> {
       let nextCursor: string | undefined = undefined;
 
       while (hasMore) {
-        const searchResult = await this.notionClient.search("", {
+        const searchResult = await this.notionClient.search({
           filter: {
             property: "object",
             value: "page"
@@ -383,15 +381,15 @@ export default class Export extends BaseCommand<typeof Export> {
         for (const page of searchResult.results || []) {
           // Only add pages that are not already in our databases
           // Pages in databases will be exported when we process the databases
-          if (page.parent?.type !== "database_id" && !processedPageIds.has(page.id)) {
+          if (page.parent?.type !== "database" && !processedPageIds.has(page.id)) {
             pages.push(page.id);
             processedPageIds.add(page.id);
             log.info(`found standalone page: ${page.title || page.id}`);
           }
         }
 
-        hasMore = searchResult.has_more || false;
-        nextCursor = searchResult.next_cursor || undefined;
+        hasMore = searchResult.hasMore || false;
+        nextCursor = searchResult.nextCursor || undefined;
       }
     } catch (error) {
       log.error("failed to discover all content, falling back to configured items");

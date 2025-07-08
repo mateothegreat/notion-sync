@@ -1,5 +1,6 @@
+import { NotionPropertyType } from "$lib/util/typing";
 import { PropertyItemListResponse, PropertyItemObjectResponse } from "@notionhq/client/build/src/api-endpoints";
-import { ErrorFactory, NotionApiError, RateLimitError } from "../../shared/errors/index";
+import { ErrorFactory, NotionError, RateLimitError } from "../../shared/errors/index";
 import {
   NotionBlock,
   NotionComment,
@@ -7,13 +8,30 @@ import {
   NotionObjectType,
   NotionPage,
   NotionPropertyItem,
-  NotionUser,
-  PropertyItemType
+  NotionSDKSearchResultDatabase,
+  NotionUser
 } from "./types";
+
+const extractTitle = (object: any): string => {
+  if (object.properties?.title?.title && Array.isArray(object.properties.title.title)) {
+    return object.properties.title.title.map((text: any) => text.plain_text).join("");
+  }
+  if (object.title && Array.isArray(object.title)) {
+    return object.title.map((text: any) => text.plain_text).join("");
+  }
+  return "Untitled";
+};
+
+const extractDescription = (object: any): string => {
+  if (object.description && Array.isArray(object.description)) {
+    return object.description.map((text: any) => text.plain_text).join("");
+  }
+  return "";
+};
 
 export namespace transformers {
   /**
-   * Transform a Notion API error into our internal format.
+   * Transform a Notion API error into our internal type.
    *
    * @param {any} error - The error to transform.
    *
@@ -25,29 +43,23 @@ export namespace transformers {
       return new RateLimitError("Rate limit exceeded.", 60) as Error;
     }
 
-    /**
-     * Using optional chaining and providing default values to handle cases
-     * where error properties are not defined.
-     */
-    const code = error?.code || "UNKNOWN_ERROR";
-
-    switch (code) {
+    switch (error.code) {
       case "unauthorized":
-        return new NotionApiError("invalid API key or insufficient permissions.", code);
+        return new NotionError("Invalid API key or insufficient permissions.", error);
       case "object_not_found":
-        return new NotionApiError("object not found.", code);
+        return new NotionError("Object not found.", error);
       case "validation_error":
-        return new NotionApiError("invalid request parameters.", code);
+        return new NotionError("Invalid request parameters.", error);
       case "conflict_error":
-        return new NotionApiError("conflict with current state.", code);
+        return new NotionError("Conflict with current state.", error);
       case "internal_server_error":
-        return new NotionApiError("notion internal server error.", code);
+        return new NotionError("Notion internal server error.", error);
       case "service_unavailable":
-        return new NotionApiError("notion service unavailable.", code);
+        return new NotionError("Notion service unavailable.", error);
       case "ECONNRESET":
       case "ENOTFOUND":
       case "ETIMEDOUT":
-        return ErrorFactory.fromNetworkError(error);
+        return ErrorFactory.fromNetworkError(error) as Error;
       default:
         return ErrorFactory.fromNotionError(error);
     }
@@ -61,19 +73,24 @@ export namespace transformers {
    * @returns {NotionPage} - The transformed page.
    */
   export const page = (notionPage: any): NotionPage => {
-    return {
+    return new NotionPage({
       id: notionPage.id,
       type: NotionObjectType.PAGE,
-      title: notionPage.title,
+      title: extractTitle(notionPage),
       properties: notionPage.properties || {},
       parent: notionPage.parent,
       url: notionPage.url,
+      publicUrl: notionPage.public_url || null,
       archived: notionPage.archived || false,
+      trashed: notionPage.in_trash || false,
       createdTime: notionPage.created_time,
       lastEditedTime: notionPage.last_edited_time,
       createdBy: notionPage.created_by,
-      lastEditedBy: notionPage.last_edited_by
-    };
+      lastEditedBy: notionPage.last_edited_by,
+      cover: notionPage.cover,
+      icon: notionPage.icon,
+      inTrash: notionPage.in_trash || false
+    });
   };
 
   /**
@@ -88,15 +105,15 @@ export namespace transformers {
       // This is a PropertyItemListResponse.
       return {
         id: response.results[0]?.id || response.property_item?.id || "",
-        type: response.type as PropertyItemType,
+        type: response.type as NotionPropertyType,
         object: "list",
-        results: response.results || [],
+        results: [],
         has_more: response.has_more,
         next_cursor: response.next_cursor,
         property_item: response.property_item
           ? {
               id: response.property_item.id,
-              type: response.property_item.type as PropertyItemType,
+              type: response.property_item.type as NotionPropertyType,
               ...response.property_item
             }
           : undefined
@@ -106,11 +123,11 @@ export namespace transformers {
       const objectResponse = response as PropertyItemObjectResponse;
       return {
         id: objectResponse.id,
-        type: objectResponse.type as PropertyItemType,
+        type: objectResponse.type as NotionPropertyType,
         object: "property_item",
         property_item: {
           id: objectResponse.id,
-          type: objectResponse.type as PropertyItemType,
+          type: objectResponse.type as NotionPropertyType,
           ...objectResponse
         }
       };
@@ -122,14 +139,19 @@ export namespace transformers {
    *
    * @param {any} notionDatabase - The Notion database response.
    *
-   * @returns {NotionDatabase} - The transformed database.
+   * @returns {NotionSDKSearchResultDatabase} - The transformed database.
    */
   export const database = (notionDatabase: any): NotionDatabase => {
     return new NotionDatabase({
       id: notionDatabase.id,
+      icon: notionDatabase.icon,
+      cover: notionDatabase.cover,
+      isInline: notionDatabase.is_inline,
+      publicUrl: notionDatabase.public_url,
+      trashed: notionDatabase.in_trash,
       type: NotionObjectType.DATABASE,
-      title: notionDatabase.title,
-      description: notionDatabase.description,
+      title: extractTitle(notionDatabase),
+      description: extractDescription(notionDatabase),
       properties: notionDatabase.properties || {},
       parent: notionDatabase.parent,
       url: notionDatabase.url,
@@ -159,7 +181,10 @@ export namespace transformers {
       createdTime: notionBlock.created_time,
       lastEditedTime: notionBlock.last_edited_time,
       createdBy: notionBlock.created_by,
-      lastEditedBy: notionBlock.last_edited_by
+      lastEditedBy: notionBlock.last_edited_by,
+      url: notionBlock.url || `https://www.notion.so/${notionBlock.id.replace(/-/g, "")}`,
+      publicUrl: notionBlock.public_url || null,
+      trashed: notionBlock.in_trash || false
     };
   };
 
@@ -196,7 +221,12 @@ export namespace transformers {
       createdTime: notionComment.created_time,
       lastEditedTime: notionComment.last_edited_time,
       createdBy: notionComment.created_by,
-      lastEditedBy: notionComment.last_edited_by
+      lastEditedBy: notionComment.last_edited_by,
+      // Comments don't have URLs in the Notion API
+      url: `https://www.notion.so/${notionComment.parent.page_id || notionComment.parent.block_id}`,
+      publicUrl: null,
+      archived: false,
+      trashed: false
     };
   };
 }

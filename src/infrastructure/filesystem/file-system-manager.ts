@@ -10,7 +10,7 @@ import path from "path";
 import { promisify } from "util";
 import { FileSystemEvents } from "../../core/events/events";
 import { WorkspaceOrganizer } from "../../lib/export/workspace-organizer";
-import { NotionBlock, NotionDatabase, NotionPage } from "../../lib/notion/types";
+import { NotionBlock, NotionSDKSearchResultDatabase, NotionSDKSearchResultPage } from "../../lib/notion/types";
 import { AtomicFileOperationManager } from "./atomic-operations";
 import { AtomicFileOperation, FileSystemConfig, FileWriter, FileWriteResult } from "./types";
 import { JSONWriter } from "./writers/json-writer";
@@ -46,7 +46,11 @@ export class FileSystemManager {
   /**
    * Write a database to file system
    */
-  async writeDatabase(database: NotionDatabase, format: Exporter, operationId?: string): Promise<string> {
+  async writeDatabase(
+    database: NotionSDKSearchResultDatabase,
+    format: Exporter,
+    operationId?: string
+  ): Promise<string> {
     const writer = this.getWriter(format);
     const outputPath = this.organizer.getDatabasePath(database, this.config.baseOutputPath);
 
@@ -71,7 +75,7 @@ export class FileSystemManager {
   /**
    * Write a page to file system
    */
-  async writePage(page: NotionPage, format: Exporter, operationId?: string): Promise<string> {
+  async writePage(page: NotionSDKSearchResultPage, format: Exporter, operationId?: string): Promise<string> {
     const writer = this.getWriter(format);
     const outputPath = this.organizer.getPagePath(page, this.config.baseOutputPath);
 
@@ -149,7 +153,7 @@ export class FileSystemManager {
   async writeAtomically(
     items: Array<{
       type: "database" | "page" | "blocks";
-      data: NotionDatabase | NotionPage | NotionBlock[];
+      data: NotionSDKSearchResultDatabase | NotionSDKSearchResultPage | NotionBlock[];
       format: Exporter;
       outputPath?: string;
     }>
@@ -163,11 +167,11 @@ export class FileSystemManager {
 
         switch (item.type) {
           case "database":
-            filePath = await this.writeDatabase(item.data as NotionDatabase, item.format, operationId);
+            filePath = await this.writeDatabase(item.data as NotionSDKSearchResultDatabase, item.format, operationId);
             break;
 
           case "page":
-            filePath = await this.writePage(item.data as NotionPage, item.format, operationId);
+            filePath = await this.writePage(item.data as NotionSDKSearchResultPage, item.format, operationId);
             break;
 
           case "blocks":

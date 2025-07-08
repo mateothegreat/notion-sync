@@ -1,4 +1,4 @@
-import { NotionDatabase, NotionObject } from "$lib/notion/types";
+import { NotionObject, NotionSDKSearchResultDatabase } from "$lib/notion/types";
 import { tskit } from "@mateothegreat/ts-kit";
 import path from "path";
 import { FileSystemConfig } from "../../infrastructure/filesystem/types";
@@ -49,7 +49,7 @@ export const database = ({
   basePath,
   config
 }: {
-  database: NotionDatabase;
+  database: NotionSDKSearchResultDatabase;
   basePath: string;
   config: FileSystemConfig;
 }): string => {

@@ -68,7 +68,7 @@ export class ExportAlreadyRunningError extends DomainError {
 }
 
 // Infrastructure Errors
-export class NotionApiError extends DomainError {
+export class NotionError extends DomainError {
   readonly code = "NOTION_API_ERROR";
   readonly statusCode = 502;
 
@@ -119,7 +119,7 @@ export class ConcurrencyError extends DomainError {
 
 // Error Factory
 export class ErrorFactory {
-  static fromNotionError(error: any): NotionApiError {
+  static fromNotionError(error: any): NotionError {
     const message = error.message || "Unknown Notion API error";
     const code = error.code || "unknown";
     const context = {
@@ -128,7 +128,7 @@ export class ErrorFactory {
       status: error.status
     };
 
-    return new NotionApiError(message, code, context);
+    return new NotionError(message, code, context);
   }
 
   static fromFileSystemError(error: any, operation: string): FileSystemError {
