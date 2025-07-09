@@ -4,7 +4,7 @@ import {
   PropertyTypeMap,
   PropertyValueType,
   ValidatePropertyStructure
-} from "$lib/util/typing";
+} from "$util/typing";
 
 export interface NotionProperty {
   id: string;
@@ -19,8 +19,8 @@ export interface NotionProperty {
  */
 export interface NotionPropertyItem {
   id?: string;
-  type: NotionPropertyType;
-  object: "property_item" | "list";
+  type: NotionPropertyType | "property_item";
+  object: "list" | "page" | "database" | "property_item" | "user" | "workspace";
   results?: NotionPropertyItem[];
   has_more?: boolean;
   next_cursor?: string | null;

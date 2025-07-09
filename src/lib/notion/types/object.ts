@@ -1,6 +1,11 @@
+import { NotionBlock } from "./block";
+import { NotionComment } from "./comment";
+import { NotionDatabase } from "./database";
+import { NotionPage } from "./page";
+import { NotionProperty, NotionPropertyItem } from "./property";
 import { NotionUser } from "./user";
 
-export class NotionObject {
+export class NotionObject implements NotionExportableObject {
   id: string;
   type: NotionObjectType;
   createdTime: string;
@@ -11,6 +16,7 @@ export class NotionObject {
   publicUrl: string | null;
   archived: boolean;
   trashed: boolean;
+  properties: Record<string, NotionPropertyItem>;
 
   constructor(data: NotionObject) {
     Object.assign(this, data);
@@ -26,3 +32,7 @@ export enum NotionObjectType {
   PROPERTY = "property",
   WORKSPACE = "workspace"
 }
+
+export type NotionObjectUnion = NotionDatabase | NotionPage | NotionBlock | NotionUser | NotionComment | NotionProperty;
+
+export type NotionExportableObject = NotionObject;

@@ -1,6 +1,229 @@
-import type { SearchParameters, SearchResponse } from "@notionhq/client/build/src/api-endpoints";
-import { NotionDatabase } from "./database";
-import { NotionPage } from "./page";
+import type {
+  DatabaseObjectResponse,
+  PageObjectResponse,
+  PartialDatabaseObjectResponse,
+  PartialPageObjectResponse,
+  SearchParameters,
+  SearchResponse
+} from "@notionhq/client/build/src/api-endpoints";
+
+/**
+ * Utility type to extract common properties between two types.
+ *
+ * @remarks
+ * This type automatically determines which properties exist in both types
+ * without requiring manual maintenance. It uses TypeScript's built-in
+ * utility types to create an intersection of the keys that exist in both types.
+ */
+type CommonKeys<T, U> = keyof T & keyof U;
+
+/**
+ * Base type representing the intersection of common properties shared by all Notion objects.
+ *
+ * @remarks
+ * This type is automatically derived from the intersection of existing library types,
+ * ensuring we don't re-implement what's already available in the dependency and
+ * don't maintain manual lists of properties. It dynamically extracts only the
+ * properties that are guaranteed to exist across all object types.
+ */
+export type NotionSDKObjectBase = Pick<
+  PageObjectResponse & DatabaseObjectResponse,
+  CommonKeys<PageObjectResponse, DatabaseObjectResponse>
+>;
+
+/**
+ * Enhanced union type for Notion SDK objects with improved discrimination capabilities.
+ *
+ * @remarks
+ * This type provides several key improvements over the original:
+ * 1. When no type parameter is provided, it returns the full union with access to common properties
+ * 2. When a specific type is provided, it returns only objects of that type
+ * 3. It maintains compatibility with existing code while adding new flexibility
+ *
+ * The type uses conditional types and mapped types to provide precise type inference
+ * based on the generic parameter, falling back to a discriminated union when no
+ * parameter is specified.
+ *
+ * @typeParam T - Optional discriminator for specific object types. When omitted,
+ * returns the full union of all possible object types.
+ *
+ * @example
+ * ```typescript
+ * // Access common properties without specifying type
+ * const obj: NotionSDKObjectUnion = getNotionObject();
+ * console.log(obj.id, obj.created_time); // Always safe
+ *
+ * // Discriminate to specific type
+ * const page: NotionSDKObjectUnion<"page"> = getNotionPage();
+ * console.log(page.properties.title); // Type-safe page access
+ * ```
+ */
+export type NotionSDKObjectUnion<T extends "page" | "database" | undefined = undefined> = T extends "page"
+  ? PageObjectResponse | PartialPageObjectResponse
+  : T extends "database"
+  ? DatabaseObjectResponse | PartialDatabaseObjectResponse
+  : T extends undefined
+  ? NotionSDKObjectDiscriminatedUnion
+  : never;
+
+/**
+ * A discriminated union of all possible Notion object types with enhanced type safety.
+ *
+ * @remarks
+ * This type serves as the foundation for the enhanced discrimination system.
+ * It combines all possible object types into a single union while maintaining
+ * the discriminator property (`object`) that enables type narrowing.
+ *
+ * The union includes both full and partial response types, ensuring compatibility
+ * with various API responses while providing type-safe access to common properties.
+ */
+export type NotionSDKObjectDiscriminatedUnion =
+  | (PageObjectResponse & { object: "page" })
+  | (PartialPageObjectResponse & { object: "page" })
+  | (DatabaseObjectResponse & { object: "database" })
+  | (PartialDatabaseObjectResponse & { object: "database" });
+
+/**
+ * Type guard function to determine if a Notion object is a page.
+ *
+ * @param obj - The Notion object to check.
+ * @returns True if the object is a page, false otherwise.
+ *
+ * @example
+ * ```typescript
+ * const obj: NotionSDKObjectUnion = getNotionObject();
+ * if (isNotionPage(obj)) {
+ *   // obj is now typed as PageObjectResponse | PartialPageObjectResponse
+ *   console.log(obj.properties);
+ * }
+ * ```
+ */
+export const isNotionPage = (obj: NotionSDKObjectDiscriminatedUnion): obj is NotionSDKObjectUnion<"page"> => {
+  return obj.object === "page";
+};
+
+/**
+ * Type guard function to determine if a Notion object is a database.
+ *
+ * @param obj - The Notion object to check.
+ * @returns True if the object is a database, false otherwise.
+ *
+ * @example
+ * ```typescript
+ * const obj: NotionSDKObjectUnion = getNotionObject();
+ * if (isNotionDatabase(obj)) {
+ *   // obj is now typed as DatabaseObjectResponse | PartialDatabaseObjectResponse
+ *   console.log(obj.title);
+ * }
+ * ```
+ */
+export const isNotionDatabase = (obj: NotionSDKObjectDiscriminatedUnion): obj is NotionSDKObjectUnion<"database"> => {
+  return obj.object === "database";
+};
+
+/**
+ * Utility type to extract common properties from any Notion object.
+ *
+ * @remarks
+ * This mapped type provides a way to access only the common properties
+ * from any Notion object type, ensuring type safety when working with
+ * mixed collections or when the specific object type is unknown.
+ *
+ * Uses the existing library types to ensure we don't re-implement what's already available.
+ */
+export type NotionSDKObjectCommon<T extends NotionSDKObjectDiscriminatedUnion> = Pick<
+  T,
+  CommonKeys<T, NotionSDKObjectBase>
+>;
+
+/**
+ * Advanced discriminator function that provides type-safe object discrimination.
+ *
+ * @remarks
+ * This function goes beyond simple type guards by providing a fluent API
+ * for object discrimination. It returns an object with methods that allow
+ * for type-safe access to specific object types while maintaining the
+ * original object reference.
+ *
+ * @param obj - The Notion object to discriminate.
+ * @returns An object with discrimination methods and the original object.
+ *
+ * @example
+ * ```typescript
+ * const obj: NotionSDKObjectUnion = getNotionObject();
+ * const discriminated = discriminateNotionObject(obj);
+ *
+ * // Access common properties safely
+ * console.log(discriminated.common.id);
+ *
+ * // Type-safe discrimination
+ * if (discriminated.isPage()) {
+ *   console.log(discriminated.asPage().properties);
+ * }
+ *
+ * // Fluent API for conditional access
+ * discriminated.whenPage(page => console.log(page.properties.title));
+ * ```
+ */
+export const discriminateNotionObject = <T extends NotionSDKObjectDiscriminatedUnion>(obj: T) => {
+  return {
+    /** The original object */
+    original: obj,
+
+    /** Common properties accessible on all object types */
+    common: obj as NotionSDKObjectCommon<T>,
+
+    /** Check if the object is a page */
+    isPage: (): boolean => isNotionPage(obj),
+
+    /** Check if the object is a database */
+    isDatabase: (): boolean => isNotionDatabase(obj),
+
+    /** Get the object as a page (throws if not a page) */
+    asPage: (): NotionSDKObjectUnion<"page"> => {
+      if (!isNotionPage(obj)) {
+        throw new Error("Object is not a page");
+      }
+      return obj;
+    },
+
+    /** Get the object as a database (throws if not a database) */
+    asDatabase: (): NotionSDKObjectUnion<"database"> => {
+      if (!isNotionDatabase(obj)) {
+        throw new Error("Object is not a database");
+      }
+      return obj;
+    },
+
+    /** Execute a callback if the object is a page */
+    whenPage: (callback: (page: NotionSDKObjectUnion<"page">) => void): void => {
+      if (isNotionPage(obj)) {
+        callback(obj);
+      }
+    },
+
+    /** Execute a callback if the object is a database */
+    whenDatabase: (callback: (database: NotionSDKObjectUnion<"database">) => void): void => {
+      if (isNotionDatabase(obj)) {
+        callback(obj);
+      }
+    },
+
+    /** Transform the object based on its type */
+    match: <R>(handlers: {
+      page: (page: NotionSDKObjectUnion<"page">) => R;
+      database: (database: NotionSDKObjectUnion<"database">) => R;
+    }): R => {
+      if (isNotionPage(obj)) {
+        return handlers.page(obj);
+      } else if (isNotionDatabase(obj)) {
+        return handlers.database(obj);
+      } else {
+        throw new Error("Unknown object type");
+      }
+    }
+  };
+};
 
 /**
  * Represents the union of all possible object types returned within the `results`
@@ -142,9 +365,56 @@ export type NotionFilteredSearchResult<T extends SearchParameters> = T extends {
 /**
  * A fully type-safe `SearchResponse` whose `results` property is precisely tailored
  * to the search parameters provided.
+ *
+ * @remarks
+ * This interface provides type-safe search responses that automatically infer
+ * the correct result types based on the search parameters. It includes support
+ * for pagination metadata and event dispatching capabilities.
+ *
+ * @typeParam T - The search parameters type used to infer the result types.
  */
-export interface NotionSearchResponse<T> {
-  results: Array<NotionDatabase | NotionPage>;
+export interface NotionSearchResponse<T extends SearchParameters> {
+  results: Array<NotionFilteredSearchResult<T>>;
   hasMore: boolean;
   nextCursor?: string;
+
+  // Event dispatching metadata
+  readonly pageInfo?: {
+    currentPage: number;
+    totalPages?: number;
+    pageSize: number;
+  };
+}
+
+/**
+ * Event payload for search result notifications.
+ *
+ * @remarks
+ * This interface defines the structure of events dispatched during search operations.
+ * It enables subscribers to receive real-time updates about search progress and results
+ * without blocking the main search operation.
+ */
+export interface NotionSearchEvent<T extends SearchParameters> {
+  readonly type: "result" | "page_complete" | "search_complete" | "error";
+  readonly data: NotionFilteredSearchResult<T> | NotionFilteredSearchResult<T>[] | Error;
+  readonly metadata: {
+    readonly pageNumber: number;
+    readonly totalResults: number;
+    readonly hasMore: boolean;
+    readonly cursor?: string;
+    readonly timestamp: Date;
+  };
+}
+
+/**
+ * Configuration for search event dispatching.
+ *
+ * @remarks
+ * This interface provides configuration options for controlling how search events
+ * are dispatched to subscribers, including batching and throttling options.
+ */
+export interface NotionSearchEventConfig {
+  readonly batchSize?: number;
+  readonly throttleMs?: number;
+  readonly enableMetrics?: boolean;
 }

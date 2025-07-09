@@ -17,8 +17,10 @@ retries: 3
 path: ./exports/notion-workspace
 # Comma-separated list of database IDs to export. Can be provided as comma-separated IDs or configured in config file.
 databases:
-  - name: content
-    id: 16ad7342e57180c4a065c7a1015871d3
+  # - name: content
+  #   id: 16ad7342e57180c4a065c7a1015871d3
+  - name: prompts
+    id: 1fed7342e57180298f33dca71e3755bf
 # Comma-separated list of page IDs to export.
 # pages: 550e8400-e29b-41d4-a716-446655440000,6ba7b810-9dad-11d1-80b4-00c04fd430c8
 # Export format.

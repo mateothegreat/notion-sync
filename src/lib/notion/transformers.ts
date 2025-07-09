@@ -1,6 +1,4 @@
-import { NotionPropertyType } from "$lib/util/typing";
 import { PropertyItemListResponse, PropertyItemObjectResponse } from "@notionhq/client/build/src/api-endpoints";
-import { ErrorFactory, NotionError, RateLimitError } from "../../shared/errors/index";
 import {
   NotionBlock,
   NotionComment,
@@ -8,18 +6,82 @@ import {
   NotionObjectType,
   NotionPage,
   NotionPropertyItem,
+  NotionSDKObjectUnion,
   NotionSDKSearchResultDatabase,
   NotionUser
 } from "./types";
 
-const extractTitle = (object: any): string => {
-  if (object.properties?.title?.title && Array.isArray(object.properties.title.title)) {
-    return object.properties.title.title.map((text: any) => text.plain_text).join("");
-  }
-  if (object.title && Array.isArray(object.title)) {
-    return object.title.map((text: any) => text.plain_text).join("");
-  }
-  return "Untitled";
+import { discriminateNotionObject } from "./types/search";
+
+/**
+ * Extract the title from a Notion object (page or database).
+ *
+ * @param obj - The Notion object.
+ * @returns The extracted title.
+ */
+export const title = (obj: NotionSDKObjectUnion): string => {
+  const discriminated = discriminateNotionObject(obj);
+
+  return discriminated.match({
+    page: (page) => {
+      // For pages, look for title property in properties
+      if ("properties" in page && page.properties) {
+        const property = Object.entries(page.properties).find(([key, value]) => {
+          return (value as any).type === "title" || key === "title";
+        });
+
+        if (property) {
+          const titleProperty = property[1] as any;
+
+          // Handle pages: title is an array of rich text objects
+          if (titleProperty.title && Array.isArray(titleProperty.title)) {
+            if (titleProperty.title.length === 0) {
+              return "Untitled";
+            }
+
+            // Concatenate all plain_text values from the rich text array
+            const titleText = titleProperty.title
+              .map((richText: any) => richText.plain_text || "")
+              .join("")
+              .trim();
+
+            return titleText || "Untitled";
+          }
+        }
+      }
+      return "Untitled";
+    },
+    database: (database) => {
+      // For databases, check if title is directly on the object first
+      if ("title" in database && database.title && Array.isArray(database.title)) {
+        const titleText = database.title
+          .map((richText: any) => richText.plain_text || "")
+          .join("")
+          .trim();
+        if (titleText) {
+          return titleText;
+        }
+      }
+
+      // For databases, look for title property in properties
+      if ("properties" in database && database.properties) {
+        const property = Object.entries(database.properties).find(([key, value]) => {
+          return (value as any).type === "title" || key === "title";
+        });
+
+        if (property) {
+          const titleProperty = property[1] as any;
+
+          // Handle databases: title might be an empty object or have different structure
+          if (titleProperty.title && typeof titleProperty.title === "object" && !Array.isArray(titleProperty.title)) {
+            // For databases, the title might be empty or have a different structure
+            return titleProperty.name || "Untitled";
+          }
+        }
+      }
+      return "Untitled";
+    }
+  });
 };
 
 const extractDescription = (object: any): string => {
@@ -38,30 +100,25 @@ export namespace transformers {
    * @returns {Error} - The transformed error.
    */
   export const error = (error: any): Error => {
-    if (error instanceof RateLimitError) {
-      // It should be caught and thrown as RateLimitError before this
-      return new RateLimitError("Rate limit exceeded.", 60) as Error;
-    }
-
     switch (error.code) {
       case "unauthorized":
-        return new NotionError("Invalid API key or insufficient permissions.", error);
+        return new Error("Invalid API key or insufficient permissions.", { cause: error });
       case "object_not_found":
-        return new NotionError("Object not found.", error);
+        return new Error("Object not found.", { cause: error });
       case "validation_error":
-        return new NotionError("Invalid request parameters.", error);
+        return new Error("Invalid request parameters.", { cause: error });
       case "conflict_error":
-        return new NotionError("Conflict with current state.", error);
+        return new Error("Conflict with current state.", { cause: error });
       case "internal_server_error":
-        return new NotionError("Notion internal server error.", error);
+        return new Error("Notion internal server error.", { cause: error });
       case "service_unavailable":
-        return new NotionError("Notion service unavailable.", error);
+        return new Error("Notion service unavailable.", { cause: error });
       case "ECONNRESET":
       case "ENOTFOUND":
       case "ETIMEDOUT":
-        return ErrorFactory.fromNetworkError(error) as Error;
+        return new Error("Network error.", { cause: error });
       default:
-        return ErrorFactory.fromNotionError(error);
+        return new Error("Unknown error.", { cause: error });
     }
   };
 
@@ -76,7 +133,7 @@ export namespace transformers {
     return new NotionPage({
       id: notionPage.id,
       type: NotionObjectType.PAGE,
-      title: extractTitle(notionPage),
+      title: title(notionPage),
       properties: notionPage.properties || {},
       parent: notionPage.parent,
       url: notionPage.url,
@@ -105,7 +162,7 @@ export namespace transformers {
       // This is a PropertyItemListResponse.
       return {
         id: response.results[0]?.id || response.property_item?.id || "",
-        type: response.type as NotionPropertyType,
+        type: response.type,
         object: "list",
         results: [],
         has_more: response.has_more,
@@ -113,7 +170,7 @@ export namespace transformers {
         property_item: response.property_item
           ? {
               id: response.property_item.id,
-              type: response.property_item.type as NotionPropertyType,
+              type: response.property_item.type,
               ...response.property_item
             }
           : undefined
@@ -123,11 +180,11 @@ export namespace transformers {
       const objectResponse = response as PropertyItemObjectResponse;
       return {
         id: objectResponse.id,
-        type: objectResponse.type as NotionPropertyType,
+        type: objectResponse.type,
         object: "property_item",
         property_item: {
           id: objectResponse.id,
-          type: objectResponse.type as NotionPropertyType,
+          type: objectResponse.type,
           ...objectResponse
         }
       };
@@ -150,7 +207,7 @@ export namespace transformers {
       publicUrl: notionDatabase.public_url,
       trashed: notionDatabase.in_trash,
       type: NotionObjectType.DATABASE,
-      title: extractTitle(notionDatabase),
+      title: title(notionDatabase),
       description: extractDescription(notionDatabase),
       properties: notionDatabase.properties || {},
       parent: notionDatabase.parent,
@@ -176,6 +233,7 @@ export namespace transformers {
       type: NotionObjectType.BLOCK,
       blockType: notionBlock.type,
       hasChildren: notionBlock.has_children || false,
+      properties: notionBlock.properties || {},
       archived: notionBlock.archived || false,
       content: notionBlock[notionBlock.type] || {},
       createdTime: notionBlock.created_time,
@@ -217,6 +275,7 @@ export namespace transformers {
       id: notionComment.id,
       type: NotionObjectType.COMMENT,
       parent: notionComment.parent,
+      properties: notionComment.properties || {},
       rich_text: notionComment.rich_text,
       createdTime: notionComment.created_time,
       lastEditedTime: notionComment.last_edited_time,

@@ -1,5 +1,7 @@
 import type { PropertyItemObjectResponse } from "@notionhq/client/build/src/api-endpoints";
 
+export type EmptyObject = Record<string, never>;
+
 /**
  * Utility to extract the 'type' field from union types.
  */
@@ -89,42 +91,3 @@ export type ValidatePropertyStructure<T> = T extends PropertyItemObjectResponse
 export type TransformPropertyType<T extends PropertyItemObjectResponse, U extends string = T["type"]> = {
   [K in keyof T as K extends "type" ? "transformedType" : K]: K extends "type" ? U : T[K];
 };
-
-/**
- * Retrieves the title from a Notion object in a type-safe manner.
- *
- * This function checks if the given Notion object is a page or a database,
- * which are the types known to have a title property. If it is, it returns
- * the title. Otherwise, it returns undefined.
- *
- * This function handles both internal application-specific Notion objects
- * and raw API responses from the Notion client.
- *
- * @param item - The Notion object from which to get the title.
- * @returns The title of the object if it's a page or database, otherwise undefined.
- */
-export function getTitle(item: any): string | undefined {
-  if (!item) {
-    return undefined;
-  }
-
-  // Handle internal NotionObject types which have a string `title`
-  if (typeof item.title === "string" && (item.type === "page" || item.type === "database")) {
-    return item.title;
-  }
-
-  // Handle Notion API DatabaseObjectResponse
-  if (item.object === "database" && item.title && Array.isArray(item.title)) {
-    return item.title[0]?.plain_text;
-  }
-
-  // Handle Notion API PageObjectResponse
-  if (item.object === "page" && item.properties) {
-    const titleProp: any = Object.values(item.properties).find((prop: any) => prop.type === "title");
-    if (titleProp && titleProp.title && Array.isArray(titleProp.title)) {
-      return titleProp.title[0]?.plain_text;
-    }
-  }
-
-  return undefined;
-}

@@ -1,6 +1,6 @@
-import { Exporter } from "$lib/exporters/exporter";
-import { NamingStrategy } from "$lib/util/normalization";
-import { OrganizationStrategy } from "$lib/util/organization";
+import { Exporter } from "$export/exporters/exporter";
+import { normalization } from "$util/normalization";
+import { organization } from "$util/organization";
 import * as fs from "fs/promises";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -29,8 +29,8 @@ describe("Config Loader", () => {
   };
 
   const base: ResolvedCommandConfig<"export"> = {
-    "naming-strategy": NamingStrategy.TITLE_AND_ID,
-    "organization-strategy": OrganizationStrategy.HIERARCHICAL,
+    "naming-strategy": normalization.strategy.TITLE_AND_ID,
+    "organization-strategy": organization.strategy.HIERARCHICAL,
     "include-archived": false,
     token: "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",
     timeout: 5000,
@@ -40,7 +40,7 @@ describe("Config Loader", () => {
     verbose: false,
     flush: false,
     pages: [],
-    output: undefined,
+    exporters: [Exporter.JSON],
     "max-concurrency": 5,
     path: "",
     databases: [], // Required field
@@ -135,6 +135,7 @@ describe("Config Loader", () => {
 
       // Valid config should work fine
       const validConfig: ResolvedCommandConfig<"export"> = {
+        exporters: [Exporter.JSON],
         flush: false,
         timeout: 0,
         token: "secret_" + "a".repeat(43),
@@ -149,9 +150,8 @@ describe("Config Loader", () => {
         "include-blocks": true,
         "include-comments": false,
         "include-properties": true,
-        output: undefined, // optional
-        "naming-strategy": NamingStrategy.TITLE_AND_ID,
-        "organization-strategy": OrganizationStrategy.HIERARCHICAL,
+        "naming-strategy": normalization.strategy.TITLE_AND_ID,
+        "organization-strategy": organization.strategy.HIERARCHICAL,
         "include-archived": false
       };
 

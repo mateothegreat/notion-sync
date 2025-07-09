@@ -1,12 +1,10 @@
 import { DatabaseObjectResponse } from "@notionhq/client";
 import { NotionObject, NotionObjectType } from "./object";
 import { NotionParent } from "./parent";
-import { NotionProperty } from "./property";
 
 export class NotionDatabase extends NotionObject {
   title: string;
   description: string;
-  properties: Record<string, NotionProperty>;
   icon: DatabaseObjectResponse["icon"];
   cover: DatabaseObjectResponse["cover"];
   isInline: boolean;

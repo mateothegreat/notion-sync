@@ -6,6 +6,7 @@
     "outDir": "./dist",
     "module": "es2022",
     "target": "ES2022",
+    "lib": ["es2022"],
     "moduleResolution": "node",
     "noEmit": false,
     "strict": true,
@@ -15,23 +16,15 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "paths": {
-      // src
-      "$core/*": ["./src/core/*"],
-      "$shared/*": ["./src/shared/*"],
-      // lib
-      "$commands/*": ["./src/lib/commands/*"],
-      "$lib/*": ["./src/lib/*"],
+      "$cli/*": ["src/lib/cli/*"],
       "$config/*": ["./src/lib/config/*"],
-      "$control-plane/*": ["./src/lib/control-plane/*"],
-      "$export/*": ["./src/lib/exporters/*"],
+      "$export/*": ["src/lib/plugins/*"],
       "$notion/*": ["./src/lib/notion/*"],
       "$objects/*": ["./src/lib/objects/*"],
       "$renderers/*": ["./src/lib/renderers/*"],
       "$util/*": ["./src/lib/util/*"],
-      // test
-      "$test/*": ["./src/test/*"]
+      "$plugins/*": ["./src/plugins/*"]
     }
   },
-  "include": ["./src/**/*"],
-  "exclude": ["./src/old/**/*", "./src/infrastructure", "**/__tests__", "./dumpster/**/*"]
+  "include": ["./src/**/*"]
 }

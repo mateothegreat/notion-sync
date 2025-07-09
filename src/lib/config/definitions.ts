@@ -1,5 +1,6 @@
-import { Exporter } from "$lib/exporters/exporter";
-import util from "$lib/util";
+import { Exporter } from "$export/exporters/exporter";
+import { normalization } from "$util/normalization";
+import { organization } from "$util/organization";
 import { Flags } from "@oclif/core";
 import { Flag } from "@oclif/core/lib/interfaces";
 import { z } from "zod";
@@ -110,9 +111,9 @@ export const definitions = createDefinitions({
     commands: ["export"],
     flag: Flags.string({
       description: "Naming strategy for exported files.",
-      default: util.normalization.NamingStrategy.ID
+      default: normalization.strategy.ID
     }),
-    schema: () => z.nativeEnum(util.normalization.NamingStrategy)
+    schema: () => z.nativeEnum(normalization.strategy)
   },
   "organization-strategy": {
     name: "organization-strategy",
@@ -120,9 +121,9 @@ export const definitions = createDefinitions({
     commands: ["export"],
     flag: Flags.string({
       description: "Organization strategy for exported files.",
-      default: util.organization.OrganizationStrategy.TYPE
+      default: organization.strategy.TYPE
     }),
-    schema: () => z.nativeEnum(util.organization.OrganizationStrategy)
+    schema: () => z.nativeEnum(organization.strategy)
   },
 
   /**

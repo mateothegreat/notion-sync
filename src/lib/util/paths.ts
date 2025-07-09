@@ -1,7 +1,7 @@
-import { NotionObject, NotionSDKSearchResultDatabase } from "$lib/notion/types";
+import { NotionDatabase, NotionObject, NotionObjectUnion } from "$notion/types";
 import { tskit } from "@mateothegreat/ts-kit";
 import path from "path";
-import { FileSystemConfig } from "../../infrastructure/filesystem/types";
+import { organization } from "./organization";
 
 /**
  * Generate hierarchical path for an object.
@@ -44,25 +44,30 @@ export const typed = async (basePath: string): Promise<void> => {
   }
 };
 
-export const database = ({
-  database,
-  basePath,
-  config
-}: {
-  database: NotionSDKSearchResultDatabase;
-  basePath: string;
-  config: FileSystemConfig;
-}): string => {
-  switch (config.organizationStrategy) {
-    case "flat":
-      return basePath;
-    case "hierarchical":
-      return hierarchical({ obj: database, base: basePath });
-    case "by-type":
-      return path.join(basePath, "databases");
-    case "by-date":
-      return dated({ date: database.createdTime, base: basePath, type: "databases" });
-    default:
-      return path.join(basePath, "databases");
-  }
-};
+export namespace paths {
+  export const database = ({
+    database,
+    basePath,
+    config
+  }: {
+    database: NotionDatabase;
+    basePath: string;
+    config: {
+      organization: organization.strategy;
+    };
+  }): string => {
+    switch (config.organization) {
+      case organization.strategy.FLAT:
+        return basePath;
+      case organization.strategy.HIERARCHICAL:
+        return hierarchical({ obj: database, base: basePath });
+      case organization.strategy.TYPE:
+      default:
+        return path.join(basePath, "databases");
+    }
+  };
+
+  export const base = (basePath: string, obj: NotionObjectUnion): string => {
+    return path.join(basePath, obj.type);
+  };
+}

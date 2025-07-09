@@ -3,7 +3,7 @@ import * as fs from "fs/promises";
 import path from "path";
 import * as yaml from "yaml";
 import { z } from "zod";
-import { log } from "../log";
+import { log } from "../util/log";
 import { Config } from "./config";
 import { definitions } from "./definitions";
 

@@ -3,7 +3,6 @@ import { NotionParent } from "./parent";
 
 export class NotionPage extends NotionObject {
   title: string;
-  properties: Record<string, any>;
   parent: NotionParent;
   cover: any;
   icon: any;
